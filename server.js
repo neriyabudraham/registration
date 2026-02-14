@@ -106,12 +106,17 @@ app.get('/callback', async (req, res) => {
     }
 
     try {
+        console.log('=== OAuth Callback Started ===');
+        console.log('Code:', code?.substring(0, 20) + '...');
+        console.log('State exists:', !!state);
+        
         // Parse state to get user data (decode UTF-8 for Hebrew support)
         let userData = {};
         if (state) {
             try {
                 const decoded = Buffer.from(state, 'base64').toString('utf-8');
                 userData = JSON.parse(decodeURIComponent(escape(decoded)));
+                console.log('User data parsed:', userData);
             } catch (e) {
                 // Fallback to simple decode
                 try {
@@ -122,6 +127,10 @@ app.get('/callback', async (req, res) => {
             }
         }
 
+        console.log('Exchanging code for tokens...');
+        console.log('Client ID:', config.google.clientId?.substring(0, 20) + '...');
+        console.log('Redirect URI:', config.google.redirectUri);
+        
         // Exchange code for tokens
         const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
             client_id: config.google.clientId,
@@ -131,7 +140,10 @@ app.get('/callback', async (req, res) => {
             redirect_uri: config.google.redirectUri
         });
 
+        console.log('Token response received');
         const { access_token, refresh_token, expires_in } = tokenResponse.data;
+        console.log('Access token exists:', !!access_token);
+        console.log('Refresh token exists:', !!refresh_token);
 
         // Get user email from Google
         const userInfoResponse = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
