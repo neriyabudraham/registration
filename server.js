@@ -146,11 +146,13 @@ app.get('/callback', async (req, res) => {
         console.log('Refresh token exists:', !!refresh_token);
 
         // Get user email from Google
+        console.log('Getting user info from Google...');
         const userInfoResponse = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
             headers: { Authorization: `Bearer ${access_token}` }
         });
 
         const googleEmail = userInfoResponse.data.email;
+        console.log('Google email:', googleEmail);
         const email = userData.email || googleEmail;
         const phone = userData.phone || '';
         const firstName = userData.firstName || '';
@@ -165,9 +167,12 @@ app.get('/callback', async (req, res) => {
         const password = cleanPhone.slice(-6);
 
         // Save to database
+        console.log('Connecting to database...');
         const connection = await pool.getConnection();
+        console.log('Database connected');
         try {
             // Update if exists, insert if not
+            console.log('Executing INSERT/UPDATE query...')
             await connection.execute(`
                 INSERT INTO לקוחות (Email, Phone, Password, AccessToken, RefreshToken, ExpirationTime, Hash, FullName)
                 VALUES (?, ?, ?, ?, ?, ?, SHA2(CONCAT(?, ?), 256), ?)
@@ -179,6 +184,7 @@ app.get('/callback', async (req, res) => {
                     FullName = COALESCE(NULLIF(VALUES(FullName), ''), FullName),
                     Phone = COALESCE(NULLIF(VALUES(Phone), ''), Phone)
             `, [email, formattedPhone, password, access_token, refresh_token, expires_in, email, formattedPhone, fullName]);
+            console.log('Database insert/update done');
 
             // Get user data for WhatsApp message
             const [rows] = await connection.execute(`
