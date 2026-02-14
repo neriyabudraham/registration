@@ -75,6 +75,17 @@ form.addEventListener('submit', async (e) => {
         timestamp: new Date().toISOString()
     };
     
+    // Send notification that registration started
+    try {
+        await fetch('/api/notify-start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+    } catch (e) {
+        console.log('Notify error:', e);
+    }
+    
     // Build Google OAuth URL with state parameter (encode UTF-8 for Hebrew support)
     const state = btoa(unescape(encodeURIComponent(JSON.stringify(formData))));
     

@@ -56,6 +56,43 @@ app.get('/api/config', (req, res) => {
     });
 });
 
+// Notify on registration start
+app.post('/api/notify-start', async (req, res) => {
+    try {
+        const { firstName, lastName, phone, email } = req.body;
+        
+        // Format phone for WhatsApp link
+        const cleanPhone = phone.replace(/\s+/g, '').replace(/^\+/, '').replace(/^0/, '972');
+        const whatsappPhone = cleanPhone.startsWith('972') ? cleanPhone : '972' + cleanPhone;
+        
+        const message = `*בעל עסק התחיל הרשמה כעת*
+
+*שם:* ${firstName} ${lastName}
+*טלפון:* ${phone}
+*אימייל:* ${email}
+
+*קישור לווצאפ:*
+wa.me/${whatsappPhone}`;
+
+        await axios.post(config.whatsapp.apiUrl, {
+            chatId: config.whatsapp.chatId,
+            text: message,
+            session: config.whatsapp.session
+        }, {
+            headers: {
+                'accept': 'application/json',
+                'X-Api-Key': config.whatsapp.apiKey,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Notify start error:', error.response?.data || error.message);
+        res.json({ success: false });
+    }
+});
+
 // OAuth Callback
 app.get('/callback', async (req, res) => {
     const { code, state, error } = req.query;
