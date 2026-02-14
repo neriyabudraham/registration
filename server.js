@@ -69,13 +69,19 @@ app.get('/callback', async (req, res) => {
     }
 
     try {
-        // Parse state to get user data
+        // Parse state to get user data (decode UTF-8 for Hebrew support)
         let userData = {};
         if (state) {
             try {
-                userData = JSON.parse(Buffer.from(state, 'base64').toString());
+                const decoded = Buffer.from(state, 'base64').toString('utf-8');
+                userData = JSON.parse(decodeURIComponent(escape(decoded)));
             } catch (e) {
-                console.error('Error parsing state:', e);
+                // Fallback to simple decode
+                try {
+                    userData = JSON.parse(Buffer.from(state, 'base64').toString());
+                } catch (e2) {
+                    console.error('Error parsing state:', e2);
+                }
             }
         }
 
