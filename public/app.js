@@ -1,13 +1,28 @@
-// Configuration
-const CONFIG = {
-    clientId: '335567162380-01vu2ekj253hhltsg1lfc2g6vh72jq40.apps.googleusercontent.com',
-    redirectUri: 'https://n8n.neriyabudraham.co.il/webhook/callback',
+// Configuration - will be loaded from server
+let CONFIG = {
+    clientId: '',
+    redirectUri: '',
     scopes: [
         'https://www.googleapis.com/auth/contacts',
         'https://www.googleapis.com/auth/script.external_request',
         'https://www.googleapis.com/auth/userinfo.email'
     ].join(' ')
 };
+
+// Load config from server
+async function loadConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+        CONFIG.clientId = data.clientId;
+        CONFIG.redirectUri = data.redirectUri;
+    } catch (error) {
+        console.error('Failed to load config:', error);
+        // Fallback to hardcoded values
+        CONFIG.clientId = '335567162380-01vu2ekj253hhltsg1lfc2g6vh72jq40.apps.googleusercontent.com';
+        CONFIG.redirectUri = window.location.origin + '/callback';
+    }
+}
 
 // DOM Elements
 const form = document.getElementById('registrationForm');
@@ -39,11 +54,16 @@ inputs.forEach(input => {
 validateForm();
 
 // Handle form submission
-form.addEventListener('submit', (e) => {
+form.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     if (!validateForm()) {
         return;
+    }
+
+    // Make sure config is loaded
+    if (!CONFIG.clientId) {
+        await loadConfig();
     }
     
     // Collect form data
@@ -55,14 +75,8 @@ form.addEventListener('submit', (e) => {
         timestamp: new Date().toISOString()
     };
     
-    // Save to localStorage for callback page
-    localStorage.setItem('registrationData', JSON.stringify(formData));
-    
     // Build Google OAuth URL with state parameter
-    const state = btoa(JSON.stringify({
-        ...formData,
-        origin: window.location.origin
-    }));
+    const state = btoa(JSON.stringify(formData));
     
     const authUrl = new URL('https://accounts.google.com/o/oauth2/auth');
     authUrl.searchParams.set('client_id', CONFIG.clientId);
@@ -90,3 +104,6 @@ document.getElementById('phone').addEventListener('input', function(e) {
     
     e.target.value = value;
 });
+
+// Load config on page load
+loadConfig();

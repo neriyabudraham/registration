@@ -144,7 +144,7 @@ input:invalid:not(:placeholder-shown) {
     line-height: 1.5;
 }
 
-/* Callback Page Styles */
+/* Result Page Styles */
 .result-state {
     text-align: center;
 }

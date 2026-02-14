@@ -1,45 +1,81 @@
 # Registration Form - Botomat
 
-טופס הרשמה עם התחברות Google OAuth לגישה לאנשי קשר.
+טופס הרשמה עם Google OAuth, שמירה ל-MySQL ושליחת הודעה לוואטסאפ.
 
 ## Features
 
-- טופס הרשמה מודרני (שם פרטי, משפחה, טלפון, אימייל)
+- טופס הרשמה (שם פרטי, משפחה, טלפון, אימייל)
 - התחברות עם Google OAuth
 - הרשאות לגישה לאנשי קשר
-- דף callback להצגת תוצאה (הצלחה/כישלון)
+- שמירת טוקנים ב-MySQL
+- שליחת הודעה לוואטסאפ
 
-## Deployment
-
-### Docker
+## Local Development
 
 ```bash
-# Build and run
-docker-compose up -d --build
+# Install dependencies
+npm install
 
-# Or manually
-docker build -t registration-botomat .
-docker run -d -p 3080:80 --name registration-botomat registration-botomat
+# Copy env file and fill in values
+cp .env.example .env
+
+# Run dev server
+npm run dev
 ```
 
-### Server Setup
+Open http://localhost:3000
 
-הדומיין: https://registration.botomat.co.il/  
-מיקום בשרת: `/www/wwwroot/registration.botomat.co.il`
+## Production Deployment (Docker)
 
-## Google OAuth Configuration
+```bash
+# Create .env file
+cp .env.example .env
+# Edit .env with production values
 
-- Client ID: `335567162380-01vu2ekj253hhltsg1lfc2g6vh72jq40.apps.googleusercontent.com`
-- Redirect URI: `https://n8n.neriyabudraham.co.il/webhook/callback`
-- Scopes:
-  - `https://www.googleapis.com/auth/contacts`
-  - `https://www.googleapis.com/auth/script.external_request`
-  - `https://www.googleapis.com/auth/userinfo.email`
+# Build and run
+docker-compose up -d --build
+```
 
-## Flow
+## Environment Variables
 
-1. משתמש ממלא טופס
-2. לחיצה על "התחבר עם Google"
-3. הפניה ל-Google OAuth
-4. Google מפנה ל-n8n webhook עם code
-5. n8n מטפל באימות ומחזיר לדף callback עם תוצאה
+| Variable | Description |
+|----------|-------------|
+| `PORT` | Server port (default: 3000) |
+| `BASE_URL` | Public URL of the site |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `GOOGLE_REDIRECT_URI` | OAuth callback URL |
+| `MYSQL_HOST` | MySQL host |
+| `MYSQL_PORT` | MySQL port (default: 3306) |
+| `MYSQL_USER` | MySQL username |
+| `MYSQL_PASSWORD` | MySQL password |
+| `MYSQL_DATABASE` | MySQL database name |
+| `WHATSAPP_API_URL` | WhatsApp API endpoint |
+| `WHATSAPP_API_KEY` | WhatsApp API key |
+| `WHATSAPP_SESSION` | WhatsApp session ID |
+| `WHATSAPP_CHAT_ID` | WhatsApp chat/group ID |
+
+## Google Cloud Console Setup
+
+Add to Authorized redirect URIs:
+- `https://registration.botomat.co.il/callback`
+- `http://localhost:3000/callback` (for local dev)
+
+## Database Table
+
+```sql
+CREATE TABLE IF NOT EXISTS לקוחות (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    Email VARCHAR(255) UNIQUE,
+    Phone VARCHAR(20),
+    Password VARCHAR(10),
+    FullName VARCHAR(255),
+    Project VARCHAR(255),
+    AccessToken TEXT,
+    RefreshToken TEXT,
+    ExpirationTime INT,
+    Hash VARCHAR(64),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
