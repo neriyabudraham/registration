@@ -3,9 +3,9 @@ services:
     build: .
     container_name: registration-botomat
     restart: unless-stopped
-    ports:
-      - "3850:3000"
+    network_mode: host
     env_file:
       - .env
     environment:
       - NODE_ENV=production
+      - PORT=3850
