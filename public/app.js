@@ -75,8 +75,8 @@ form.addEventListener('submit', async (e) => {
         timestamp: new Date().toISOString()
     };
     
-    // Build Google OAuth URL with state parameter
-    const state = btoa(JSON.stringify(formData));
+    // Build Google OAuth URL with state parameter (encode UTF-8 for Hebrew support)
+    const state = btoa(unescape(encodeURIComponent(JSON.stringify(formData))));
     
     const authUrl = new URL('https://accounts.google.com/o/oauth2/auth');
     authUrl.searchParams.set('client_id', CONFIG.clientId);
