@@ -4,7 +4,7 @@ services:
     container_name: registration-botomat
     restart: unless-stopped
     ports:
-      - "3080:3000"
+      - "3749:3000"
     env_file:
       - .env
     environment:
