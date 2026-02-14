@@ -43,6 +43,11 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Register page (alias for home)
+app.get('/register', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Get config for frontend
 app.get('/api/config', (req, res) => {
     res.json({
