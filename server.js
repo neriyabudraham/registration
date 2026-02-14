@@ -198,8 +198,13 @@ app.get('/callback', async (req, res) => {
         }
 
     } catch (error) {
-        console.error('OAuth error:', error.response?.data || error.message);
-        res.redirect(`/result.html?error=oauth_error&message=${encodeURIComponent(error.message)}`);
+        console.error('OAuth error:', JSON.stringify({
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        }, null, 2));
+        const errorMsg = error.response?.data?.error_description || error.response?.data?.error || error.message || 'Unknown error';
+        res.redirect(`/result.html?error=oauth_error&message=${encodeURIComponent(errorMsg)}`);
     }
 });
 
