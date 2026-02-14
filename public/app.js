@@ -19,7 +19,7 @@ async function loadConfig() {
     } catch (error) {
         console.error('Failed to load config:', error);
         // Fallback to hardcoded values
-        CONFIG.clientId = '335567162380-01vu2ekj253hhltsg1lfc2g6vh72jq40.apps.googleusercontent.com';
+        CONFIG.clientId = '335567162380-4fddiii2ogdvok371r36vd3f3b4t55au.apps.googleusercontent.com';
         CONFIG.redirectUri = window.location.origin + '/callback';
     }
 }
