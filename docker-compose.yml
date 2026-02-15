@@ -1,11 +1,10 @@
 services:
   registration:
     build: .
-    container_name: registration-botomat
+    container_name: registration-form
     restart: unless-stopped
     network_mode: host
     env_file:
       - .env
     environment:
       - NODE_ENV=production
-      - PORT=3850
