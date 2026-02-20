@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html dir="rtl" lang="he">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,42 +14,49 @@
         <div class="card" id="resultCard">
             <!-- Success State -->
             <div id="successState" class="result-state" style="display: none;">
-                <div class="result-icon success">
-                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <div class="result-icon">
+                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
                         <circle cx="40" cy="40" r="40" fill="#10B981"/>
                         <path d="M25 40L35 50L55 30" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </div>
-                <h1>ההרשמה הושלמה בהצלחה!</h1>
-                <p class="result-message">החשבון שלך חובר בהצלחה לשירות אנשי הקשר של Google.</p>
+                <h2>✅ התהליך הושלם בהצלחה!</h2>
+                <p class="result-message">התחברת בהצלחה לגוגל והפרטים נשמרו במערכת</p>
                 <div class="user-info" id="userInfo"></div>
-                <a href="/" class="btn-back">חזרה לדף הבית</a>
+                <div class="info-box success">
+                    <p>✨ <strong>סיימנו!</strong> כל הנתונים נשמרו והתהליך הושלם במלואו</p>
+                </div>
+                <p style="text-align: center; color: var(--text-light); margin-top: 1.5rem;">תודה רבה על השימוש בשירות! 💚</p>
             </div>
             
             <!-- Error State -->
             <div id="errorState" class="result-state" style="display: none;">
-                <div class="result-icon error">
-                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <div class="result-icon">
+                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
                         <circle cx="40" cy="40" r="40" fill="#EF4444"/>
                         <path d="M28 28L52 52M52 28L28 52" stroke="white" stroke-width="4" stroke-linecap="round"/>
                     </svg>
                 </div>
-                <h1>אופס! משהו השתבש</h1>
+                <h2>אופס! משהו השתבש</h2>
                 <p class="result-message" id="errorMessage">ההתחברות נכשלה. אנא נסה שוב.</p>
-                <a href="/" class="btn-back">נסה שוב</a>
+                <div class="info-box">
+                    <p>💡 <strong>טיפ:</strong> ודא שאישרת את כל ההרשאות הנדרשות בעת ההתחברות לגוגל</p>
+                </div>
+                <div style="text-align: center; margin-top: 1.5rem;">
+                    <a href="/" class="btn-back">נסה שוב</a>
+                </div>
             </div>
             
             <!-- Loading State -->
             <div id="loadingState" class="result-state">
                 <div class="loader"></div>
-                <h1>מעבד את הבקשה...</h1>
-                <p class="result-message">אנא המתן</p>
+                <h2>מעבד את הבקשה...</h2>
+                <p class="result-message">אנא המתן, זה ייקח רק כמה שניות</p>
             </div>
         </div>
     </div>
 
     <script>
-        // Parse URL parameters
         function getUrlParams() {
             const params = new URLSearchParams(window.location.search);
             return {
@@ -61,7 +68,6 @@
             };
         }
 
-        // Show result
         function showResult() {
             const params = getUrlParams();
             const loadingState = document.getElementById('loadingState');
@@ -70,42 +76,46 @@
             const userInfo = document.getElementById('userInfo');
             const errorMessage = document.getElementById('errorMessage');
             
-            loadingState.style.display = 'none';
-            
-            if (params.success === 'true') {
-                successState.style.display = 'block';
+            // Small delay for better UX
+            setTimeout(() => {
+                loadingState.style.display = 'none';
                 
-                let infoHtml = '';
-                if (params.name) {
-                    infoHtml += `<p><strong>שם:</strong> ${params.name}</p>`;
-                }
-                if (params.email) {
-                    infoHtml += `<p><strong>אימייל:</strong> ${params.email}</p>`;
-                }
-                
-                if (infoHtml) {
-                    userInfo.innerHTML = infoHtml;
+                if (params.success === 'true') {
+                    successState.style.display = 'block';
+                    
+                    let infoHtml = '';
+                    if (params.name) {
+                        infoHtml += `<p><strong>שם:</strong> ${decodeURIComponent(params.name)}</p>`;
+                    }
+                    if (params.email) {
+                        infoHtml += `<p><strong>אימייל:</strong> ${decodeURIComponent(params.email)}</p>`;
+                    }
+                    
+                    if (infoHtml) {
+                        userInfo.innerHTML = infoHtml;
+                        userInfo.style.display = 'block';
+                    } else {
+                        userInfo.style.display = 'none';
+                    }
                 } else {
-                    userInfo.style.display = 'none';
+                    errorState.style.display = 'block';
+                    
+                    const errorMessages = {
+                        'access_denied': 'הגישה נדחתה. אנא אשר את ההרשאות הנדרשות.',
+                        'invalid_request': 'הבקשה לא תקינה. אנא נסה שוב.',
+                        'no_code': 'לא התקבל קוד אימות מגוגל.',
+                        'oauth_error': 'שגיאה בתהליך ההתחברות.',
+                        'database_error': 'שגיאה בשמירת הנתונים.',
+                        'server_error': 'שגיאת שרת. אנא נסה שוב מאוחר יותר.'
+                    };
+                    
+                    let msg = errorMessages[params.error] || params.error || 'שגיאה לא ידועה';
+                    if (params.message) {
+                        msg += `: ${decodeURIComponent(params.message)}`;
+                    }
+                    errorMessage.textContent = msg;
                 }
-            } else {
-                errorState.style.display = 'block';
-                
-                const errorMessages = {
-                    'access_denied': 'הגישה נדחתה. אנא אשר את ההרשאות הנדרשות.',
-                    'invalid_request': 'הבקשה לא תקינה. אנא נסה שוב.',
-                    'no_code': 'לא התקבל קוד אימות מגוגל.',
-                    'oauth_error': 'שגיאה בתהליך ההתחברות.',
-                    'database_error': 'שגיאה בשמירת הנתונים.',
-                    'server_error': 'שגיאת שרת. אנא נסה שוב מאוחר יותר.'
-                };
-                
-                let msg = errorMessages[params.error] || params.error || 'שגיאה לא ידועה';
-                if (params.message) {
-                    msg += `: ${params.message}`;
-                }
-                errorMessage.textContent = msg;
-            }
+            }, 800);
         }
 
         document.addEventListener('DOMContentLoaded', showResult);

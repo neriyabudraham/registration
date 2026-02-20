@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html dir="rtl" lang="he">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,60 +11,92 @@
 </head>
 <body>
     <div class="container">
-        <div class="card">
-            <div class="logo">
-                <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="30" cy="30" r="30" fill="url(#gradient)"/>
-                    <path d="M20 25C20 22.2386 22.2386 20 25 20H35C37.7614 20 40 22.2386 40 25V35C40 37.7614 37.7614 40 35 40H25C22.2386 40 20 37.7614 20 35V25Z" fill="white"/>
-                    <circle cx="27" cy="28" r="3" fill="#4F46E5"/>
-                    <circle cx="33" cy="28" r="3" fill="#4F46E5"/>
-                    <path d="M25 34C25 34 27 37 30 37C33 37 35 34 35 34" stroke="#4F46E5" stroke-width="2" stroke-linecap="round"/>
-                    <defs>
-                        <linearGradient id="gradient" x1="0" y1="0" x2="60" y2="60" gradientUnits="userSpaceOnUse">
-                            <stop stop-color="#4F46E5"/>
-                            <stop offset="1" stop-color="#7C3AED"/>
-                        </linearGradient>
-                    </defs>
-                </svg>
+        <!-- Instructions Section -->
+        <div id="instructionsSection" class="card">
+            <h2>הוראות התחברות</h2>
+            <div class="instructions-text">
+                <p>ההתחברות לאפליקציה של גוגל צריכה להיות על חשבון הגוגל שבו אתם רוצים שיישמרו לכם אנשי הקשר.</p>
+                <p style="margin-top: 1rem;">כאשר מתחברים לגוגל יש לאשר את שני הריבועים שמופיעים:</p>
+                <ul>
+                    <li>אישור לבצע פעולות באנשי הקשר</li>
+                    <li>אישור לבצע פעולות בשירות מרוחק</li>
+                </ul>
             </div>
-            <h1>הרשמה למערכת</h1>
-            <p class="subtitle">מלאו את הפרטים והתחברו עם חשבון Google</p>
+
+            <div class="video-link">
+                <a href="#" id="openVideoBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    לצפייה בסרטון הדרכה
+                </a>
+            </div>
+
+            <div class="checkbox-container">
+                <input type="checkbox" id="readInstructions">
+                <label for="readInstructions">קראתי את ההוראות והבנתי אותן</label>
+            </div>
+        </div>
+
+        <!-- Video Modal -->
+        <div id="videoModal" class="modal">
+            <div class="modal-content">
+                <button id="closeVideoBtn" class="close-btn">&times;</button>
+                <div class="video-wrapper">
+                    <video id="instructionVideo" controls playsinline>
+                        <source src="https://files.neriyabudraham.co.il/files/save_video-output_20250903_1az9w.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="video-checkbox-container">
+                    <input type="checkbox" id="videoWatched">
+                    <label for="videoWatched">צפיתי בסרטון, אפשר להמשיך</label>
+                </div>
+                <button id="continueFromVideo" class="btn-primary" disabled>המשך</button>
+            </div>
+        </div>
+
+        <!-- Registration Form -->
+        <div id="formSection" class="card" style="display: none;">
+            <button id="backToInstructions" class="back-btn" title="חזרה להוראות">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <h2>השארת פרטים</h2>
             
             <form id="registrationForm">
                 <div class="form-group">
                     <label for="firstName">שם פרטי</label>
-                    <input type="text" id="firstName" name="firstName" required placeholder="הכנס שם פרטי">
+                    <input type="text" id="firstName" name="firstName" placeholder="הכנס/י את שמך הפרטי" required>
                 </div>
                 
                 <div class="form-group">
                     <label for="lastName">שם משפחה</label>
-                    <input type="text" id="lastName" name="lastName" required placeholder="הכנס שם משפחה">
+                    <input type="text" id="lastName" name="lastName" placeholder="הכנס/י את שם המשפחה" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="phone">טלפון</label>
-                    <input type="tel" id="phone" name="phone" required placeholder="05X-XXXXXXX" pattern="[0-9\-+\s]{9,15}">
+                    <label for="phone">מספר טלפון</label>
+                    <input type="tel" id="phone" name="phone" placeholder="הכנס/י מספר טלפון" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="email">אימייל</label>
-                    <input type="email" id="email" name="email" required placeholder="example@email.com">
+                    <label for="email">כתובת אימייל</label>
+                    <input type="email" id="email" name="email" placeholder="הכנס/י כתובת אימייל" required>
                 </div>
                 
-                <button type="submit" class="btn-google" id="googleBtn">
-                    <svg class="google-icon" viewBox="0 0 24 24" width="24" height="24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                <button type="submit" class="btn-google" id="submitBtn">
+                    <svg class="google-icon" viewBox="0 0 48 48" width="24" height="24">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                     </svg>
-                    התחבר עם Google
+                    <span>שליחה והתחברות עם Google</span>
                 </button>
+                
+                <div id="errorMessage" class="error-message"></div>
             </form>
-            
-            <p class="terms">
-                בלחיצה על "התחבר עם Google" אתה מאשר גישה לשירות אנשי הקשר
-            </p>
         </div>
     </div>
 
