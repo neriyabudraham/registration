@@ -37,27 +37,28 @@ async function loadConfig() {
     }
 }
 
-// Show/hide sections without animation issues
-function showSection(section) {
-    section.classList.remove('hidden');
-    section.classList.add('visible');
-    section.style.display = 'block';
-}
-
-function hideSection(section) {
-    section.classList.remove('visible');
-    section.classList.add('hidden');
-}
-
-// Switch between sections
-function switchSections(from, to, callback) {
-    hideSection(from);
+// Smooth transition between sections
+function transitionTo(fromSection, toSection, beforeShow) {
+    // Add fade out animation
+    fromSection.classList.add('fade-out');
     
+    // Wait for animation to complete
     setTimeout(() => {
-        from.style.display = 'none';
-        if (callback) callback();
-        showSection(to);
-    }, 350);
+        fromSection.style.display = 'none';
+        fromSection.classList.remove('fade-out');
+        
+        // Execute callback before showing
+        if (beforeShow) beforeShow();
+        
+        // Show new section with fade in
+        toSection.style.display = 'block';
+        toSection.classList.add('fade-in');
+        
+        // Remove animation class after completion
+        setTimeout(() => {
+            toSection.classList.remove('fade-in');
+        }, 500);
+    }, 400);
 }
 
 // Instructions checkbox handler
@@ -68,7 +69,7 @@ document.getElementById('readInstructions').addEventListener('change', function(
 });
 
 function goToForm() {
-    switchSections(instructionsSection, formSection, () => {
+    transitionTo(instructionsSection, formSection, () => {
         // Restore saved values
         document.getElementById('firstName').value = formData.firstName;
         document.getElementById('lastName').value = formData.lastName;
@@ -87,7 +88,7 @@ document.getElementById('backToInstructions').addEventListener('click', function
     formData.phone = document.getElementById('phone').value.trim();
     formData.email = document.getElementById('email').value.trim();
     
-    switchSections(formSection, instructionsSection, () => {
+    transitionTo(formSection, instructionsSection, () => {
         // Reset checkbox
         document.getElementById('readInstructions').checked = false;
     });
@@ -112,20 +113,15 @@ document.getElementById('continueFromVideo').addEventListener('click', function(
     e.preventDefault();
     closeVideoModal();
     
-    // Wait for modal to close, then go to form
+    // Wait for modal to close, then transition to form
     setTimeout(() => {
-        // Hide instructions first
-        instructionsSection.style.display = 'none';
-        instructionsSection.classList.add('hidden');
-        
-        // Restore saved values
-        document.getElementById('firstName').value = formData.firstName;
-        document.getElementById('lastName').value = formData.lastName;
-        document.getElementById('phone').value = formData.phone;
-        document.getElementById('email').value = formData.email;
-        
-        // Show form
-        showSection(formSection);
+        transitionTo(instructionsSection, formSection, () => {
+            // Restore saved values
+            document.getElementById('firstName').value = formData.firstName;
+            document.getElementById('lastName').value = formData.lastName;
+            document.getElementById('phone').value = formData.phone;
+            document.getElementById('email').value = formData.email;
+        });
     }, 300);
 });
 
@@ -257,15 +253,10 @@ document.getElementById('phone').addEventListener('input', function(e) {
     });
 });
 
-// Initialize
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Make sure form is hidden initially
+    // Hide form initially
     formSection.style.display = 'none';
-    formSection.classList.add('hidden');
-    
-    // Show instructions
-    instructionsSection.style.display = 'block';
-    instructionsSection.classList.add('visible');
     
     // Load config
     loadConfig();

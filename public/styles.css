@@ -44,14 +44,9 @@ body {
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
     padding: 2rem;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    position: relative;
     overflow: hidden;
-    opacity: 1;
-    transform: translateY(0);
-    transition: opacity 0.35s ease, transform 0.35s ease;
+    animation: fadeSlideIn 0.5s ease-out;
 }
 
 .card::before {
@@ -64,18 +59,34 @@ body {
     background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
 }
 
-.card.hidden {
-    opacity: 0;
-    transform: translateY(15px);
-    pointer-events: none;
-    visibility: hidden;
+@keyframes fadeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.card.visible {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
-    visibility: visible;
+@keyframes fadeSlideOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-15px);
+    }
+}
+
+.card.fade-out {
+    animation: fadeSlideOut 0.4s ease-out forwards;
+}
+
+.card.fade-in {
+    animation: fadeSlideIn 0.5s ease-out forwards;
 }
 
 h2 {
@@ -514,8 +525,7 @@ h2 {
 @media (max-width: 640px) {
     body {
         padding: 16px;
-        align-items: flex-start;
-        padding-top: 30px;
+        align-items: center;
     }
 
     .container {
