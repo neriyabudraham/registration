@@ -233,17 +233,54 @@ registrationForm.addEventListener('submit', async function(e) {
     }
 });
 
-// Phone number formatting
+// Phone number formatting - handles multiple formats
 document.getElementById('phone').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/[^\d]/g, '');
+    let value = e.target.value;
     
-    if (value.length > 3 && value.length <= 7) {
-        value = value.slice(0, 3) + '-' + value.slice(3);
-    } else if (value.length > 7) {
-        value = value.slice(0, 3) + '-' + value.slice(3, 10);
+    // Remove everything except digits
+    let digits = value.replace(/[^\d]/g, '');
+    
+    // Handle international format (972...)
+    if (digits.startsWith('972')) {
+        digits = '0' + digits.slice(3); // Convert 972 to 0
     }
     
-    e.target.value = value;
+    // Keep only 10 digits max (Israeli format)
+    digits = digits.slice(0, 10);
+    
+    // Format as 05X-XXXXXXX
+    if (digits.length > 3) {
+        e.target.value = digits.slice(0, 3) + '-' + digits.slice(3);
+    } else {
+        e.target.value = digits;
+    }
+});
+
+// Also handle paste event for phone
+document.getElementById('phone').addEventListener('paste', function(e) {
+    e.preventDefault();
+    let pastedText = (e.clipboardData || window.clipboardData).getData('text');
+    
+    // Remove everything except digits
+    let digits = pastedText.replace(/[^\d]/g, '');
+    
+    // Handle international format
+    if (digits.startsWith('972')) {
+        digits = '0' + digits.slice(3);
+    }
+    
+    // Keep only 10 digits
+    digits = digits.slice(0, 10);
+    
+    // Format and insert
+    if (digits.length > 3) {
+        this.value = digits.slice(0, 3) + '-' + digits.slice(3);
+    } else {
+        this.value = digits;
+    }
+    
+    // Update formData
+    formData.phone = this.value;
 });
 
 // Save form data on input
