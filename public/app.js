@@ -37,52 +37,60 @@ async function loadConfig() {
     }
 }
 
-// Transition helper
-function transitionSections(hideSection, showSection) {
-    hideSection.classList.add('fade-out');
+// Show/hide sections without animation issues
+function showSection(section) {
+    section.classList.remove('hidden');
+    section.classList.add('visible');
+    section.style.display = 'block';
+}
+
+function hideSection(section) {
+    section.classList.remove('visible');
+    section.classList.add('hidden');
+}
+
+// Switch between sections
+function switchSections(from, to, callback) {
+    hideSection(from);
     
     setTimeout(() => {
-        hideSection.style.display = 'none';
-        hideSection.classList.remove('fade-out');
-        
-        showSection.style.display = 'block';
-        showSection.classList.add('fade-in');
-        
-        setTimeout(() => {
-            showSection.classList.remove('fade-in');
-        }, 400);
-    }, 400);
+        from.style.display = 'none';
+        if (callback) callback();
+        showSection(to);
+    }, 350);
 }
 
 // Instructions checkbox handler
 document.getElementById('readInstructions').addEventListener('change', function() {
     if (this.checked) {
-        showFormSection();
+        goToForm();
     }
 });
 
-function showFormSection() {
-    // Restore saved values
-    document.getElementById('firstName').value = formData.firstName;
-    document.getElementById('lastName').value = formData.lastName;
-    document.getElementById('phone').value = formData.phone;
-    document.getElementById('email').value = formData.email;
-    
-    transitionSections(instructionsSection, formSection);
+function goToForm() {
+    switchSections(instructionsSection, formSection, () => {
+        // Restore saved values
+        document.getElementById('firstName').value = formData.firstName;
+        document.getElementById('lastName').value = formData.lastName;
+        document.getElementById('phone').value = formData.phone;
+        document.getElementById('email').value = formData.email;
+    });
 }
 
 // Back button handler
-document.getElementById('backToInstructions').addEventListener('click', function() {
+document.getElementById('backToInstructions').addEventListener('click', function(e) {
+    e.preventDefault();
+    
     // Save current values
     formData.firstName = document.getElementById('firstName').value.trim();
     formData.lastName = document.getElementById('lastName').value.trim();
     formData.phone = document.getElementById('phone').value.trim();
     formData.email = document.getElementById('email').value.trim();
     
-    transitionSections(formSection, instructionsSection);
-    
-    // Reset checkbox
-    document.getElementById('readInstructions').checked = false;
+    switchSections(formSection, instructionsSection, () => {
+        // Reset checkbox
+        document.getElementById('readInstructions').checked = false;
+    });
 });
 
 // Video Modal handlers
@@ -91,15 +99,34 @@ document.getElementById('openVideoBtn').addEventListener('click', function(e) {
     openVideoModal();
 });
 
-document.getElementById('closeVideoBtn').addEventListener('click', closeVideoModal);
+document.getElementById('closeVideoBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    closeVideoModal();
+});
 
 document.getElementById('videoWatched').addEventListener('change', function() {
     document.getElementById('continueFromVideo').disabled = !this.checked;
 });
 
-document.getElementById('continueFromVideo').addEventListener('click', function() {
+document.getElementById('continueFromVideo').addEventListener('click', function(e) {
+    e.preventDefault();
     closeVideoModal();
-    showFormSection();
+    
+    // Wait for modal to close, then go to form
+    setTimeout(() => {
+        // Hide instructions first
+        instructionsSection.style.display = 'none';
+        instructionsSection.classList.add('hidden');
+        
+        // Restore saved values
+        document.getElementById('firstName').value = formData.firstName;
+        document.getElementById('lastName').value = formData.lastName;
+        document.getElementById('phone').value = formData.phone;
+        document.getElementById('email').value = formData.email;
+        
+        // Show form
+        showSection(formSection);
+    }, 300);
 });
 
 // Close modal on backdrop click
@@ -129,6 +156,10 @@ function closeVideoModal() {
     video.currentTime = 0;
     videoModal.classList.remove('active');
     document.body.style.overflow = '';
+    
+    // Reset video checkbox
+    document.getElementById('videoWatched').checked = false;
+    document.getElementById('continueFromVideo').disabled = true;
 }
 
 // Form submission
@@ -226,5 +257,16 @@ document.getElementById('phone').addEventListener('input', function(e) {
     });
 });
 
-// Load config on page load
-loadConfig();
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    // Make sure form is hidden initially
+    formSection.style.display = 'none';
+    formSection.classList.add('hidden');
+    
+    // Show instructions
+    instructionsSection.style.display = 'block';
+    instructionsSection.classList.add('visible');
+    
+    // Load config
+    loadConfig();
+});

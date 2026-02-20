@@ -2,7 +2,7 @@
 <html dir="rtl" lang="he">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>הרשמה - Botomat</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,7 +12,7 @@
 <body>
     <div class="container">
         <!-- Instructions Section -->
-        <div id="instructionsSection" class="card">
+        <div id="instructionsSection" class="card visible">
             <h2>הוראות התחברות</h2>
             <div class="instructions-text">
                 <p>ההתחברות לאפליקציה של גוגל צריכה להיות על חשבון הגוגל שבו אתם רוצים שיישמרו לכם אנשי הקשר.</p>
@@ -41,9 +41,9 @@
         <!-- Video Modal -->
         <div id="videoModal" class="modal">
             <div class="modal-content">
-                <button id="closeVideoBtn" class="close-btn">&times;</button>
+                <button id="closeVideoBtn" class="close-btn" type="button">&times;</button>
                 <div class="video-wrapper">
-                    <video id="instructionVideo" controls playsinline>
+                    <video id="instructionVideo" controls playsinline preload="metadata">
                         <source src="https://files.neriyabudraham.co.il/files/save_video-output_20250903_1az9w.mp4" type="video/mp4">
                     </video>
                 </div>
@@ -51,38 +51,58 @@
                     <input type="checkbox" id="videoWatched">
                     <label for="videoWatched">צפיתי בסרטון, אפשר להמשיך</label>
                 </div>
-                <button id="continueFromVideo" class="btn-primary" disabled>המשך</button>
+                <button id="continueFromVideo" class="btn-primary" type="button" disabled>המשך</button>
             </div>
         </div>
 
         <!-- Registration Form -->
-        <div id="formSection" class="card" style="display: none;">
-            <button id="backToInstructions" class="back-btn" title="חזרה להוראות">
+        <div id="formSection" class="card hidden">
+            <button id="backToInstructions" class="back-btn" type="button" title="חזרה להוראות">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M19 12H5M12 19l-7-7 7-7"/>
                 </svg>
             </button>
             <h2>השארת פרטים</h2>
             
-            <form id="registrationForm">
+            <form id="registrationForm" autocomplete="on">
                 <div class="form-group">
                     <label for="firstName">שם פרטי</label>
-                    <input type="text" id="firstName" name="firstName" placeholder="הכנס/י את שמך הפרטי" required>
+                    <input type="text" id="firstName" name="firstName" 
+                           placeholder="הכנס/י את שמך הפרטי" 
+                           required
+                           autocomplete="given-name"
+                           inputmode="text"
+                           enterkeyhint="next">
                 </div>
                 
                 <div class="form-group">
                     <label for="lastName">שם משפחה</label>
-                    <input type="text" id="lastName" name="lastName" placeholder="הכנס/י את שם המשפחה" required>
+                    <input type="text" id="lastName" name="lastName" 
+                           placeholder="הכנס/י את שם המשפחה" 
+                           required
+                           autocomplete="family-name"
+                           inputmode="text"
+                           enterkeyhint="next">
                 </div>
                 
                 <div class="form-group">
                     <label for="phone">מספר טלפון</label>
-                    <input type="tel" id="phone" name="phone" placeholder="הכנס/י מספר טלפון" required>
+                    <input type="tel" id="phone" name="phone" 
+                           placeholder="הכנס/י מספר טלפון" 
+                           required
+                           autocomplete="tel"
+                           inputmode="tel"
+                           enterkeyhint="next">
                 </div>
                 
                 <div class="form-group">
                     <label for="email">כתובת אימייל</label>
-                    <input type="email" id="email" name="email" placeholder="הכנס/י כתובת אימייל" required>
+                    <input type="email" id="email" name="email" 
+                           placeholder="הכנס/י כתובת אימייל" 
+                           required
+                           autocomplete="email"
+                           inputmode="email"
+                           enterkeyhint="done">
                 </div>
                 
                 <button type="submit" class="btn-google" id="submitBtn">
