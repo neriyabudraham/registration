@@ -233,25 +233,48 @@ class DatabaseService {
                     COALESCE(SUM(s.pending_count), 0) as total_pending,
                     COALESCE(SUM(s.saved_count), 0) as total_saved,
                     COALESCE(SUM(s.existed_count), 0) as total_existed,
-                    COUNT(DISTINCT s.campaign_name) as campaign_count
+                    COUNT(DISTINCT s.campaign_name) as campaign_count,
+                    MAX(s.last_processed) as last_activity
                 FROM cs_customers c
                 LEFT JOIN cs_campaign_stats s ON c.phone = s.customer_phone
                 WHERE c.is_active = TRUE
                 GROUP BY c.id
-                ORDER BY c.full_name, c.phone
             `);
 
-            // Get last hour saves for each customer
+            // Get last hour and last month saves for each customer
             for (const customer of customers) {
+                // Last hour
                 const [hourStats] = await connection.execute(`
                     SELECT COALESCE(SUM(saved_count), 0) as last_hour_saved
                     FROM cs_hourly_stats
                     WHERE customer_phone = ?
                     AND hour_timestamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
                 `, [customer.phone]);
-                
                 customer.last_hour_saved = Number(hourStats[0]?.last_hour_saved) || 0;
+
+                // Last month activity
+                const [monthStats] = await connection.execute(`
+                    SELECT COALESCE(SUM(saved_count + existed_count), 0) as last_month_activity
+                    FROM cs_hourly_stats
+                    WHERE customer_phone = ?
+                    AND hour_timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                `, [customer.phone]);
+                customer.last_month_activity = Number(monthStats[0]?.last_month_activity) || 0;
             }
+
+            // Sort: prioritize customers with pending OR recent activity
+            customers.sort((a, b) => {
+                const aPending = Number(a.total_pending) || 0;
+                const bPending = Number(b.total_pending) || 0;
+                const aMonthActivity = a.last_month_activity || 0;
+                const bMonthActivity = b.last_month_activity || 0;
+                
+                // Priority score: pending contacts + recent month activity
+                const aScore = (aPending > 0 ? 1000 : 0) + aMonthActivity + (a.has_valid_tokens ? 100 : 0);
+                const bScore = (bPending > 0 ? 1000 : 0) + bMonthActivity + (b.has_valid_tokens ? 100 : 0);
+                
+                return bScore - aScore;
+            });
 
             return customers;
         } finally {

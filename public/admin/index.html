@@ -822,8 +822,33 @@
                 return;
             }
             
-            grid.innerHTML = customers.map(c => `
-                <div class="customer-card" onclick="openCustomerDetail('${c.phone}')">
+            // Split into active and inactive
+            const activeCustomers = customers.filter(c => 
+                Number(c.total_pending) > 0 || c.last_month_activity > 0 || c.has_valid_tokens
+            );
+            const inactiveCustomers = customers.filter(c => 
+                Number(c.total_pending) === 0 && !c.last_month_activity && !c.has_valid_tokens
+            );
+            
+            let html = '';
+            
+            if (activeCustomers.length > 0) {
+                html += `<div class="section-divider" style="grid-column: 1/-1; margin: 0.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--success); color: var(--success); font-weight: 600;">🟢 לקוחות פעילים (${activeCustomers.length})</div>`;
+                html += activeCustomers.map(c => renderCustomerCard(c)).join('');
+            }
+            
+            if (inactiveCustomers.length > 0) {
+                html += `<div class="section-divider" style="grid-column: 1/-1; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--text-light); color: var(--text-light); font-weight: 600;">⚪ לקוחות לא פעילים (${inactiveCustomers.length})</div>`;
+                html += inactiveCustomers.map(c => renderCustomerCard(c, true)).join('');
+            }
+            
+            grid.innerHTML = html;
+        }
+        
+        function renderCustomerCard(c, inactive = false) {
+            const opacity = inactive ? 'opacity: 0.7;' : '';
+            return `
+                <div class="customer-card" onclick="openCustomerDetail('${c.phone}')" style="${opacity}">
                     <div class="customer-card-header">
                         <div class="customer-info">
                             <h3>${c.full_name || 'ללא שם'}</h3>
@@ -835,6 +860,9 @@
                                 : '<span class="badge badge-warning">לא מחובר</span>'}
                             ${c.last_error 
                                 ? '<span class="badge badge-danger">שגיאה</span>' 
+                                : ''}
+                            ${Number(c.total_pending) > 0 
+                                ? '<span class="badge badge-warning">ממתינים</span>' 
                                 : ''}
                         </div>
                     </div>
@@ -860,10 +888,12 @@
                         <span>${c.email || '-'}</span>
                         ${c.last_hour_saved > 0 
                             ? `<span class="last-hour-badge">+${c.last_hour_saved} בשעה</span>` 
-                            : ''}
+                            : c.last_month_activity > 0 
+                                ? `<span style="font-size: 0.8rem; color: var(--success);">פעיל החודש</span>`
+                                : ''}
                     </div>
                 </div>
-            `).join('');
+            `;
         }
         
         async function openCustomerDetail(phone) {
