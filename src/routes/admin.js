@@ -214,7 +214,7 @@ module.exports = (pool, config, contactSaver) => {
         res.json({ success: true });
     });
 
-    // Get contact saver status
+    // Get dashboard summary
     router.get('/status', verifyAdmin, async (req, res) => {
         try {
             const status = await contactSaver.getStatus();
@@ -225,25 +225,31 @@ module.exports = (pool, config, contactSaver) => {
         }
     });
 
-    // Get all customers
+    // Get all customers with stats
     router.get('/customers', verifyAdmin, async (req, res) => {
-        const connection = await pool.getConnection();
         try {
-            const [customers] = await connection.execute(`
-                SELECT 
-                    id, Email, Phone, FullName, Project,
-                    CASE WHEN AccessToken IS NOT NULL THEN 1 ELSE 0 END as hasAccessToken,
-                    CASE WHEN RefreshToken IS NOT NULL THEN 1 ELSE 0 END as hasRefreshToken,
-                    created_at
-                FROM לקוחות
-                ORDER BY id DESC
-            `);
+            const customers = await contactSaver.getCustomers();
             res.json(customers);
         } catch (error) {
             console.error('Customers error:', error);
             res.status(500).json({ error: 'Failed to get customers' });
-        } finally {
-            connection.release();
+        }
+    });
+
+    // Get specific customer details
+    router.get('/customers/:phone', verifyAdmin, async (req, res) => {
+        try {
+            const { phone } = req.params;
+            const details = await contactSaver.getCustomerDetails(phone);
+            
+            if (!details) {
+                return res.status(404).json({ error: 'Customer not found' });
+            }
+            
+            res.json(details);
+        } catch (error) {
+            console.error('Customer details error:', error);
+            res.status(500).json({ error: 'Failed to get customer details' });
         }
     });
 

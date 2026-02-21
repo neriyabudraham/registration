@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ניהול - Botomat</title>
+    <title>ניהול שמירת אנשי קשר - Botomat</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -95,8 +95,9 @@
             font-family: inherit;
             cursor: pointer;
             transition: all 0.2s;
-            width: 100%;
         }
+        
+        .btn-block { width: 100%; }
         
         .btn-primary {
             background: var(--primary);
@@ -112,6 +113,7 @@
             border: 2px solid var(--border);
             color: var(--text);
             margin-top: 1rem;
+            width: 100%;
         }
         
         .btn-google:hover {
@@ -160,10 +162,16 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
         
         .header h1 {
             font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         .header-actions {
@@ -192,10 +200,6 @@
             color: var(--white);
         }
         
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-        
         .btn-success {
             background: var(--success);
             color: var(--white);
@@ -207,83 +211,106 @@
             margin: 0 auto;
         }
         
+        /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
             margin-bottom: 2rem;
         }
         
         .stat-card {
             background: var(--white);
             border-radius: var(--radius);
-            padding: 1.5rem;
+            padding: 1.25rem;
             box-shadow: var(--shadow);
         }
         
         .stat-card h3 {
             color: var(--text-light);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: 500;
             margin-bottom: 0.5rem;
         }
         
         .stat-card .value {
-            font-size: 2rem;
+            font-size: 1.75rem;
             font-weight: 700;
-            color: var(--primary);
         }
         
-        .card {
-            background: var(--white);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
+        .stat-card .value.primary { color: var(--primary); }
+        .stat-card .value.success { color: var(--success); }
+        .stat-card .value.warning { color: var(--warning); }
+        .stat-card .value.danger { color: var(--danger); }
+        
+        /* Customer Cards */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             margin-bottom: 1.5rem;
         }
         
-        .card-header {
-            padding: 1.25rem 1.5rem;
+        .section-header h2 {
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .customers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .customer-card {
+            background: var(--white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .customer-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+        
+        .customer-card-header {
+            padding: 1.25rem;
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
         
-        .card-header h2 {
-            font-size: 1.25rem;
+        .customer-info h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
         }
         
-        .card-body {
-            padding: 1.5rem;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        th, td {
-            padding: 1rem;
-            text-align: right;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        th {
-            font-weight: 600;
+        .customer-info .phone {
             color: var(--text-light);
             font-size: 0.9rem;
+            direction: ltr;
+            text-align: right;
         }
         
-        tr:last-child td {
-            border-bottom: none;
+        .customer-status {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
         }
         
         .badge {
             display: inline-block;
             padding: 0.25rem 0.75rem;
             border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
         
         .badge-success {
@@ -301,9 +328,185 @@
             color: var(--danger);
         }
         
+        .customer-card-stats {
+            padding: 1.25rem;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            text-align: center;
+        }
+        
+        .mini-stat {
+            padding: 0.5rem;
+        }
+        
+        .mini-stat .label {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-bottom: 0.25rem;
+        }
+        
+        .mini-stat .value {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        
+        .customer-card-footer {
+            padding: 1rem 1.25rem;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+        
+        .last-hour-badge {
+            background: var(--success);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        
+        /* Customer Detail Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 2rem;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: var(--white);
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .modal-header h2 {
+            font-size: 1.5rem;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-light);
+            padding: 0.5rem;
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .detail-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .detail-stat {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .detail-stat .label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            margin-bottom: 0.5rem;
+        }
+        
+        .detail-stat .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .campaigns-section h3 {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        
+        .campaign-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+        }
+        
+        .campaign-table th,
+        .campaign-table td {
+            padding: 0.875rem 1rem;
+            text-align: right;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .campaign-table th {
+            background: var(--bg);
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+        
+        .campaign-table tr:hover td {
+            background: rgba(67, 97, 238, 0.05);
+        }
+        
+        .error-alert {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .error-alert .icon {
+            font-size: 1.5rem;
+        }
+        
+        .error-alert .text {
+            flex: 1;
+        }
+        
+        .error-alert .type {
+            font-weight: 600;
+            color: var(--danger);
+        }
+        
         .loading {
             text-align: center;
-            padding: 2rem;
+            padding: 3rem;
             color: var(--text-light);
         }
         
@@ -332,9 +535,13 @@
                 padding: 1rem;
             }
             
-            table {
-                display: block;
-                overflow-x: auto;
+            .customers-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .modal {
+                max-height: 100vh;
+                border-radius: 0;
             }
         }
     </style>
@@ -347,7 +554,6 @@
             
             <div id="errorMsg" class="error-msg"></div>
             
-            <!-- Setup Form (first time) -->
             <form id="setupForm" style="display: none;">
                 <p style="margin-bottom: 1.5rem; color: var(--text-light);">יצירת סיסמה חדשה למערכת</p>
                 <div class="form-group">
@@ -360,12 +566,11 @@
                 </div>
                 <div class="form-group">
                     <label>אימות סיסמה</label>
-                    <input type="password" id="setupPasswordConfirm" placeholder="הקלד שוב את הסיסמה" required>
+                    <input type="password" id="setupPasswordConfirm" placeholder="הקלד שוב" required>
                 </div>
-                <button type="submit" class="btn btn-primary">צור סיסמה</button>
+                <button type="submit" class="btn btn-primary btn-block">צור סיסמה</button>
             </form>
             
-            <!-- Login Form -->
             <form id="loginForm" style="display: none;">
                 <div class="form-group">
                     <label>אימייל</label>
@@ -375,7 +580,7 @@
                     <label>סיסמה</label>
                     <input type="password" id="loginPassword" placeholder="הכנס סיסמה" required>
                 </div>
-                <button type="submit" class="btn btn-primary">התחבר</button>
+                <button type="submit" class="btn btn-primary btn-block">התחבר</button>
                 
                 <div class="divider">או</div>
                 
@@ -400,7 +605,7 @@
     <!-- Dashboard -->
     <div id="dashboard" class="dashboard">
         <header class="header">
-            <h1>📊 לוח בקרה</h1>
+            <h1>📊 לוח בקרה - שמירת אנשי קשר</h1>
             <div class="header-actions">
                 <button onclick="runSaver()" class="btn btn-sm btn-success">▶ הפעל שמירה</button>
                 <button onclick="migrateTokens()" class="btn btn-sm btn-outline">🔒 הצפן טוקנים</button>
@@ -409,69 +614,73 @@
         </header>
         
         <main class="main-content">
+            <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-card">
                     <h3>סה"כ לקוחות</h3>
-                    <div class="value" id="totalCustomers">-</div>
+                    <div class="value primary" id="totalCustomers">-</div>
                 </div>
                 <div class="stat-card">
                     <h3>לקוחות מחוברים</h3>
-                    <div class="value" id="connectedCustomers">-</div>
+                    <div class="value success" id="connectedCustomers">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>לקוחות עם שגיאות</h3>
+                    <div class="value danger" id="errorCustomers">-</div>
                 </div>
                 <div class="stat-card">
                     <h3>ממתינים לשמירה</h3>
-                    <div class="value" id="pendingContacts">-</div>
+                    <div class="value warning" id="totalPending">-</div>
                 </div>
                 <div class="stat-card">
-                    <h3>נשמרו</h3>
-                    <div class="value" id="savedContacts">-</div>
+                    <h3>נשמרו בשעה האחרונה</h3>
+                    <div class="value success" id="lastHourSaved">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>סה"כ נשמרו</h3>
+                    <div class="value primary" id="totalSaved">-</div>
                 </div>
             </div>
             
-            <div class="card">
-                <div class="card-header">
-                    <h2>👥 לקוחות</h2>
-                    <button onclick="loadStatus()" class="btn btn-sm btn-outline">🔄 רענן</button>
-                </div>
-                <div class="card-body">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>שם</th>
-                                <th>טלפון</th>
-                                <th>אימייל</th>
-                                <th>סטטוס</th>
-                                <th>ממתינים</th>
-                                <th>נשמרו</th>
-                                <th>קיימים</th>
-                            </tr>
-                        </thead>
-                        <tbody id="customersTable">
-                            <tr>
-                                <td colspan="7" class="loading">
-                                    <div class="spinner"></div>
-                                    <p>טוען נתונים...</p>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <!-- Customers -->
+            <div class="section-header">
+                <h2>👥 לקוחות</h2>
+                <button onclick="loadData()" class="btn btn-sm btn-outline">🔄 רענן</button>
+            </div>
+            
+            <div id="customersGrid" class="customers-grid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>טוען לקוחות...</p>
                 </div>
             </div>
         </main>
+    </div>
+    
+    <!-- Customer Detail Modal -->
+    <div id="customerModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">פרטי לקוח</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>טוען פרטים...</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         const API_BASE = '/admin';
         
-        // Check authentication on load
         async function init() {
             const urlParams = new URLSearchParams(window.location.search);
             const error = urlParams.get('error');
-            if (error) {
-                showError(decodeURIComponent(error));
-            }
+            if (error) showError(decodeURIComponent(error));
             
-            // Check if logged in
             try {
                 const res = await fetch(`${API_BASE}/verify`, { credentials: 'include' });
                 if (res.ok) {
@@ -480,7 +689,6 @@
                 }
             } catch (e) {}
             
-            // Check setup status
             try {
                 const res = await fetch(`${API_BASE}/setup-status`);
                 const data = await res.json();
@@ -510,10 +718,9 @@
         function showDashboard() {
             document.getElementById('loginPage').classList.add('hidden');
             document.getElementById('dashboard').classList.add('active');
-            loadStatus();
+            loadData();
         }
         
-        // Setup form
         document.getElementById('setupForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             hideError();
@@ -535,13 +742,11 @@
                 });
                 
                 const data = await res.json();
-                
                 if (!res.ok) {
                     showError(data.error);
                     return;
                 }
                 
-                // Now login
                 document.getElementById('setupForm').style.display = 'none';
                 document.getElementById('loginForm').style.display = 'block';
                 document.getElementById('loginEmail').value = email;
@@ -550,7 +755,6 @@
             }
         });
         
-        // Login form
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             hideError();
@@ -567,7 +771,6 @@
                 });
                 
                 const data = await res.json();
-                
                 if (!res.ok) {
                     showError(data.error);
                     return;
@@ -584,53 +787,249 @@
             location.reload();
         }
         
-        async function loadStatus() {
+        async function loadData() {
             try {
-                const res = await fetch(`${API_BASE}/status`, { credentials: 'include' });
-                if (!res.ok) {
-                    if (res.status === 401) {
-                        location.reload();
-                        return;
-                    }
-                    throw new Error('Failed to load status');
+                // Load summary stats
+                const statusRes = await fetch(`${API_BASE}/status`, { credentials: 'include' });
+                if (!statusRes.ok) {
+                    if (statusRes.status === 401) location.reload();
+                    return;
                 }
+                const status = await statusRes.json();
                 
+                document.getElementById('totalCustomers').textContent = status.total_customers || 0;
+                document.getElementById('connectedCustomers').textContent = status.connected_customers || 0;
+                document.getElementById('errorCustomers').textContent = status.customers_with_errors || 0;
+                document.getElementById('totalPending').textContent = Number(status.total_pending || 0).toLocaleString();
+                document.getElementById('lastHourSaved').textContent = status.last_hour_saved || 0;
+                document.getElementById('totalSaved').textContent = Number(status.total_saved || 0).toLocaleString();
+                
+                // Load customers
+                const customersRes = await fetch(`${API_BASE}/customers`, { credentials: 'include' });
+                const customers = await customersRes.json();
+                
+                renderCustomers(customers);
+            } catch (e) {
+                console.error('Load data error:', e);
+            }
+        }
+        
+        function renderCustomers(customers) {
+            const grid = document.getElementById('customersGrid');
+            
+            if (!customers || customers.length === 0) {
+                grid.innerHTML = '<p style="color: var(--text-light); text-align: center; padding: 2rem;">אין לקוחות להצגה</p>';
+                return;
+            }
+            
+            grid.innerHTML = customers.map(c => `
+                <div class="customer-card" onclick="openCustomerDetail('${c.phone}')">
+                    <div class="customer-card-header">
+                        <div class="customer-info">
+                            <h3>${c.full_name || 'ללא שם'}</h3>
+                            <div class="phone">${c.phone || '-'}</div>
+                        </div>
+                        <div class="customer-status">
+                            ${c.has_valid_tokens 
+                                ? '<span class="badge badge-success">מחובר</span>' 
+                                : '<span class="badge badge-warning">לא מחובר</span>'}
+                            ${c.last_error 
+                                ? '<span class="badge badge-danger">שגיאה</span>' 
+                                : ''}
+                        </div>
+                    </div>
+                    <div class="customer-card-stats">
+                        <div class="mini-stat">
+                            <div class="label">קמפיינים</div>
+                            <div class="value" style="color: var(--primary)">${c.campaign_count || 0}</div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="label">ממתינים</div>
+                            <div class="value" style="color: var(--warning)">${Number(c.total_pending || 0).toLocaleString()}</div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="label">נשמרו</div>
+                            <div class="value" style="color: var(--success)">${Number(c.total_saved || 0).toLocaleString()}</div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="label">קיימים</div>
+                            <div class="value" style="color: var(--text-light)">${Number(c.total_existed || 0).toLocaleString()}</div>
+                        </div>
+                    </div>
+                    <div class="customer-card-footer">
+                        <span>${c.email || '-'}</span>
+                        ${c.last_hour_saved > 0 
+                            ? `<span class="last-hour-badge">+${c.last_hour_saved} בשעה</span>` 
+                            : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        async function openCustomerDetail(phone) {
+            document.getElementById('customerModal').classList.add('active');
+            document.getElementById('modalBody').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>טוען פרטים...</p>
+                </div>
+            `;
+            
+            try {
+                const res = await fetch(`${API_BASE}/customers/${phone}`, { credentials: 'include' });
                 const data = await res.json();
                 
-                // Update stats
-                const customers = data.customers || [];
-                document.getElementById('totalCustomers').textContent = customers.length;
-                document.getElementById('connectedCustomers').textContent = customers.filter(c => c.hasTokens).length;
-                document.getElementById('pendingContacts').textContent = customers.reduce((sum, c) => sum + c.pending, 0);
-                document.getElementById('savedContacts').textContent = customers.reduce((sum, c) => sum + c.saved, 0);
-                
-                // Update table
-                const tbody = document.getElementById('customersTable');
-                if (customers.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-light);">אין לקוחות</td></tr>';
+                if (!res.ok) {
+                    document.getElementById('modalBody').innerHTML = `<p>שגיאה: ${data.error}</p>`;
                     return;
                 }
                 
-                tbody.innerHTML = customers.map(c => `
-                    <tr>
-                        <td>${c.name || '-'}</td>
-                        <td dir="ltr">${c.phone || '-'}</td>
-                        <td>${c.email || '-'}</td>
-                        <td>
-                            ${c.hasTokens 
-                                ? '<span class="badge badge-success">מחובר</span>' 
-                                : '<span class="badge badge-warning">לא מחובר</span>'}
-                        </td>
-                        <td>${c.pending}</td>
-                        <td>${c.saved}</td>
-                        <td>${c.existed}</td>
-                    </tr>
-                `).join('');
-                
+                renderCustomerDetail(data);
             } catch (e) {
-                console.error('Load status error:', e);
+                document.getElementById('modalBody').innerHTML = `<p>שגיאה בטעינת הנתונים</p>`;
             }
         }
+        
+        function renderCustomerDetail(data) {
+            const { customer, campaigns, summary, recentActivity } = data;
+            
+            document.getElementById('modalTitle').textContent = customer.full_name || customer.phone;
+            
+            let html = '';
+            
+            // Error alert
+            if (customer.last_error) {
+                html += `
+                    <div class="error-alert">
+                        <span class="icon">⚠️</span>
+                        <div class="text">
+                            <div class="type">${customer.last_error_type || 'שגיאה'}</div>
+                            <div>${customer.last_error}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Summary stats
+            html += `
+                <div class="detail-summary">
+                    <div class="detail-stat">
+                        <div class="label">סה"כ אנשי קשר</div>
+                        <div class="value" style="color: var(--primary)">${Number(summary.total_contacts).toLocaleString()}</div>
+                    </div>
+                    <div class="detail-stat">
+                        <div class="label">ממתינים</div>
+                        <div class="value" style="color: var(--warning)">${Number(summary.total_pending).toLocaleString()}</div>
+                    </div>
+                    <div class="detail-stat">
+                        <div class="label">נשמרו</div>
+                        <div class="value" style="color: var(--success)">${Number(summary.total_saved).toLocaleString()}</div>
+                    </div>
+                    <div class="detail-stat">
+                        <div class="label">כבר קיימים</div>
+                        <div class="value" style="color: var(--text-light)">${Number(summary.total_existed).toLocaleString()}</div>
+                    </div>
+                    <div class="detail-stat">
+                        <div class="label">נשמרו בשעה</div>
+                        <div class="value" style="color: var(--success)">${summary.last_hour_saved}</div>
+                    </div>
+                </div>
+            `;
+            
+            // Campaigns table
+            if (campaigns && campaigns.length > 0) {
+                html += `
+                    <div class="campaigns-section">
+                        <h3>📁 קמפיינים (${campaigns.length})</h3>
+                        <table class="campaign-table">
+                            <thead>
+                                <tr>
+                                    <th>שם קמפיין</th>
+                                    <th>סה"כ</th>
+                                    <th>ממתינים</th>
+                                    <th>נשמרו</th>
+                                    <th>קיימים</th>
+                                    <th>עדכון אחרון</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${campaigns.map(c => `
+                                    <tr>
+                                        <td><strong>${c.campaign_name}</strong></td>
+                                        <td>${c.total_contacts}</td>
+                                        <td style="color: var(--warning)">${c.pending_count}</td>
+                                        <td style="color: var(--success)">${c.saved_count}</td>
+                                        <td>${c.existed_count}</td>
+                                        <td style="font-size: 0.85rem; color: var(--text-light)">
+                                            ${c.last_processed ? new Date(c.last_processed).toLocaleString('he-IL') : '-'}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            // Recent activity
+            if (recentActivity && recentActivity.length > 0) {
+                html += `
+                    <div class="campaigns-section">
+                        <h3>📋 פעילות אחרונה</h3>
+                        <table class="campaign-table">
+                            <thead>
+                                <tr>
+                                    <th>שם</th>
+                                    <th>טלפון</th>
+                                    <th>קמפיין</th>
+                                    <th>סטטוס</th>
+                                    <th>זמן</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${recentActivity.slice(0, 20).map(a => `
+                                    <tr>
+                                        <td>${a.contact_name || '-'}</td>
+                                        <td dir="ltr">${a.contact_phone}</td>
+                                        <td style="font-size: 0.85rem">${a.campaign_name}</td>
+                                        <td>
+                                            <span class="badge ${
+                                                a.status === 'saved' ? 'badge-success' :
+                                                a.status === 'existed' ? 'badge-warning' :
+                                                a.status === 'error' ? 'badge-danger' : ''
+                                            }">
+                                                ${a.status === 'saved' ? 'נשמר' :
+                                                  a.status === 'existed' ? 'קיים' :
+                                                  a.status === 'error' ? 'שגיאה' : a.status}
+                                            </span>
+                                        </td>
+                                        <td style="font-size: 0.8rem; color: var(--text-light)">
+                                            ${a.processed_at ? new Date(a.processed_at).toLocaleString('he-IL') : '-'}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('modalBody').innerHTML = html;
+        }
+        
+        function closeModal() {
+            document.getElementById('customerModal').classList.remove('active');
+        }
+        
+        // Close modal on click outside
+        document.getElementById('customerModal').addEventListener('click', (e) => {
+            if (e.target.id === 'customerModal') closeModal();
+        });
+        
+        // Close modal on Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
         
         async function runSaver() {
             try {
@@ -641,7 +1040,7 @@
                 
                 if (res.ok) {
                     alert('שמירת אנשי קשר הופעלה');
-                    setTimeout(loadStatus, 3000);
+                    setTimeout(loadData, 5000);
                 }
             } catch (e) {
                 alert('שגיאה בהפעלת השמירה');
@@ -672,7 +1071,7 @@
         // Auto refresh every 30 seconds
         setInterval(() => {
             if (document.getElementById('dashboard').classList.contains('active')) {
-                loadStatus();
+                loadData();
             }
         }, 30000);
         

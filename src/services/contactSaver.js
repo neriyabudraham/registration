@@ -1,5 +1,6 @@
 const GoogleContactsService = require('./googleContacts');
 const EncryptionService = require('./encryption');
+const DatabaseService = require('./database');
 const axios = require('axios');
 
 class ContactSaverService {
@@ -7,9 +8,24 @@ class ContactSaverService {
         this.pool = pool;
         this.config = config;
         this.encryption = new EncryptionService(config.encryptionKey);
+        this.db = new DatabaseService(pool);
         this.isRunning = false;
         this.rateLimitedCustomers = new Map(); // customerId -> resumeTime
         this.errorNotifications = new Set(); // Track sent notifications to avoid duplicates
+        this.initialized = false;
+    }
+
+    // Initialize database tables
+    async initialize() {
+        if (this.initialized) return;
+        try {
+            await this.db.initializeTables();
+            await this.db.syncCustomers();
+            this.initialized = true;
+            console.log('ContactSaverService initialized');
+        } catch (error) {
+            console.error('Failed to initialize ContactSaverService:', error);
+        }
     }
 
     // Get all tables that need processing
@@ -20,7 +36,7 @@ class ContactSaverService {
                 SELECT TABLE_NAME 
                 FROM information_schema.TABLES 
                 WHERE TABLE_SCHEMA = ? 
-                AND (TABLE_NAME LIKE 'הגרלה%' OR TABLE_NAME LIKE 'הגרלת%' OR TABLE_NAME LIKE 'שמירת_אנשי_קשר%')
+                AND (TABLE_NAME LIKE 'הגרלה%' OR TABLE_NAME LIKE 'הגרלת%' OR TABLE_NAME LIKE 'שמירת\\_אנשי\\_קשר%')
             `, [this.config.database]);
             
             return tables.map(t => t.TABLE_NAME);
@@ -47,7 +63,7 @@ class ContactSaverService {
         }
     }
 
-    // Get customer by phone
+    // Get customer by phone from לקוחות table
     async getCustomerByPhone(phone) {
         const connection = await this.pool.getConnection();
         try {
@@ -79,7 +95,6 @@ class ContactSaverService {
     async updateContactStatus(tableName, primaryPhone, customerPhone, status) {
         const connection = await this.pool.getConnection();
         try {
-            // Use backticks for column name since it's a phone number
             await connection.execute(
                 `UPDATE \`${tableName}\` SET \`${customerPhone}\` = ?, UpdateTime = NOW() WHERE \`Phone\` = ?`,
                 [status, primaryPhone]
@@ -98,8 +113,44 @@ class ContactSaverService {
             );
             return rows;
         } catch (error) {
-            // Column might not exist
             return [];
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Get all contacts from a table for stats
+    async getTableStats(tableName, customerPhone) {
+        const connection = await this.pool.getConnection();
+        try {
+            // Check if column exists
+            const [columns] = await connection.execute(`
+                SELECT COLUMN_NAME 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?
+            `, [this.config.database, tableName, customerPhone]);
+            
+            if (columns.length === 0) return null;
+
+            const [stats] = await connection.execute(`
+                SELECT 
+                    COUNT(*) as total,
+                    CAST(SUM(CASE WHEN \`${customerPhone}\` = 0 THEN 1 ELSE 0 END) AS SIGNED) as pending,
+                    CAST(SUM(CASE WHEN \`${customerPhone}\` = 1 THEN 1 ELSE 0 END) AS SIGNED) as saved,
+                    CAST(SUM(CASE WHEN \`${customerPhone}\` = 2 THEN 1 ELSE 0 END) AS SIGNED) as existed,
+                    CAST(SUM(CASE WHEN \`${customerPhone}\` IN (3, 4) THEN 1 ELSE 0 END) AS SIGNED) as ignored
+                FROM \`${tableName}\`
+            `);
+            
+            return {
+                total: Number(stats[0].total) || 0,
+                pending: Number(stats[0].pending) || 0,
+                saved: Number(stats[0].saved) || 0,
+                existed: Number(stats[0].existed) || 0,
+                ignored: Number(stats[0].ignored) || 0
+            };
+        } catch (error) {
+            return null;
         } finally {
             connection.release();
         }
@@ -126,12 +177,14 @@ class ContactSaverService {
     async sendErrorNotification(customerPhone, errorType, errorMessage) {
         const notificationKey = `${customerPhone}:${errorType}`;
         
-        // Don't send duplicate notifications
         if (this.errorNotifications.has(notificationKey)) {
             return;
         }
         
         this.errorNotifications.add(notificationKey);
+        
+        // Update database
+        await this.db.updateCustomerError(customerPhone, errorType, errorMessage, true);
         
         const errorMessages = {
             'TOKEN_INVALID': 'טוקן לא תקין - נדרשת התחברות מחדש',
@@ -165,9 +218,10 @@ class ContactSaverService {
         }
     }
 
-    // Clear error notification (when issue is resolved)
+    // Clear error notification
     clearErrorNotification(customerPhone, errorType) {
         this.errorNotifications.delete(`${customerPhone}:${errorType}`);
+        this.db.clearCustomerError(customerPhone);
     }
 
     // Process a single customer
@@ -201,6 +255,12 @@ class ContactSaverService {
         let errorCount = 0;
         
         for (const tableName of tables) {
+            // Update stats for this campaign
+            const stats = await this.getTableStats(tableName, customerPhone);
+            if (stats) {
+                await this.db.updateCampaignStats(customerPhone, tableName, stats);
+            }
+            
             const contacts = await this.getContactsToSave(tableName, customerPhone);
             
             for (const contact of contacts) {
@@ -208,12 +268,15 @@ class ContactSaverService {
                     const result = await googleService.saveContactWithLabel(
                         contact.FullName || 'ללא שם',
                         contact.Phone,
-                        tableName // Use table name as label
+                        tableName
                     );
                     
-                    // Update status based on result
                     const newStatus = result.status === 'created' ? 1 : 2;
                     await this.updateContactStatus(tableName, contact.Phone, customerPhone, newStatus);
+                    
+                    // Log to our database
+                    const logStatus = result.status === 'created' ? 'saved' : 'existed';
+                    await this.db.logSaveAttempt(customerPhone, tableName, contact.Phone, contact.FullName, logStatus);
                     
                     if (result.status === 'created') {
                         savedCount++;
@@ -237,8 +300,13 @@ class ContactSaverService {
                 } catch (error) {
                     errorCount++;
                     
+                    // Log error
+                    await this.db.logSaveAttempt(
+                        customerPhone, tableName, contact.Phone, contact.FullName, 
+                        'error', error.message || error.code
+                    );
+                    
                     if (error.code === 'RATE_LIMIT') {
-                        // Set rate limit wait time
                         const waitMs = (error.retryAfter || 60) * 1000;
                         this.rateLimitedCustomers.set(customerPhone, Date.now() + waitMs);
                         await this.sendErrorNotification(customerPhone, 'RATE_LIMIT', `ממתין ${error.retryAfter} שניות`);
@@ -252,6 +320,12 @@ class ContactSaverService {
                     
                     console.error(`Error saving contact for ${customerPhone}:`, error);
                 }
+            }
+            
+            // Update final stats after processing
+            const finalStats = await this.getTableStats(tableName, customerPhone);
+            if (finalStats) {
+                await this.db.updateCampaignStats(customerPhone, tableName, finalStats);
             }
         }
         
@@ -270,10 +344,16 @@ class ContactSaverService {
             return;
         }
         
+        // Initialize if needed
+        await this.initialize();
+        
         this.isRunning = true;
         console.log('Starting contact saver run...');
         
         try {
+            // Sync customers first
+            await this.db.syncCustomers();
+            
             // Get all relevant tables
             const tables = await this.getContactTables();
             console.log(`Found ${tables.length} tables to process`);
@@ -300,92 +380,22 @@ class ContactSaverService {
         }
     }
 
-    // Get status for admin panel
+    // Get status using our database
     async getStatus() {
-        const tables = await this.getContactTables();
-        const stats = {
-            tables: tables.length,
-            customers: [],
-            rateLimited: []
-        };
-        
-        // Get customer stats
-        const connection = await this.pool.getConnection();
-        try {
-            const [customers] = await connection.execute(`
-                SELECT Phone, Email, FullName, 
-                       CASE WHEN AccessToken IS NOT NULL AND RefreshToken IS NOT NULL THEN 1 ELSE 0 END as hasTokens
-                FROM לקוחות
-            `);
-            
-            for (const customer of customers) {
-                const customerStats = {
-                    phone: customer.Phone,
-                    email: customer.Email,
-                    name: customer.FullName,
-                    hasTokens: customer.hasTokens === 1,
-                    pending: 0,
-                    saved: 0,
-                    existed: 0
-                };
-                
-                // Check if this customer has a phone column in any table
-                if (!customer.Phone) {
-                    stats.customers.push(customerStats);
-                    continue;
-                }
-                
-                // Count contacts per status for this customer
-                for (const table of tables) {
-                    try {
-                        // First check if column exists
-                        const [columns] = await connection.execute(`
-                            SELECT COLUMN_NAME 
-                            FROM information_schema.COLUMNS 
-                            WHERE TABLE_SCHEMA = ? 
-                            AND TABLE_NAME = ? 
-                            AND COLUMN_NAME = ?
-                        `, [this.config.database, table, customer.Phone]);
-                        
-                        if (columns.length === 0) continue;
-                        
-                        // Count by status
-                        const [counts] = await connection.execute(`
-                            SELECT 
-                                CAST(COALESCE(SUM(CASE WHEN \`${customer.Phone}\` = 0 THEN 1 ELSE 0 END), 0) AS SIGNED) as pending,
-                                CAST(COALESCE(SUM(CASE WHEN \`${customer.Phone}\` = 1 THEN 1 ELSE 0 END), 0) AS SIGNED) as saved,
-                                CAST(COALESCE(SUM(CASE WHEN \`${customer.Phone}\` = 2 THEN 1 ELSE 0 END), 0) AS SIGNED) as existed
-                            FROM \`${table}\`
-                        `);
-                        
-                        if (counts[0]) {
-                            customerStats.pending += Number(counts[0].pending) || 0;
-                            customerStats.saved += Number(counts[0].saved) || 0;
-                            customerStats.existed += Number(counts[0].existed) || 0;
-                        }
-                    } catch (e) {
-                        console.error(`Error counting for ${customer.Phone} in ${table}:`, e.message);
-                    }
-                }
-                
-                stats.customers.push(customerStats);
-            }
-            
-            // Get rate limited customers
-            for (const [phone, resumeTime] of this.rateLimitedCustomers) {
-                if (Date.now() < resumeTime) {
-                    stats.rateLimited.push({
-                        phone,
-                        resumeAt: new Date(resumeTime).toISOString()
-                    });
-                }
-            }
-            
-        } finally {
-            connection.release();
-        }
-        
-        return stats;
+        await this.initialize();
+        return await this.db.getDashboardSummary();
+    }
+
+    // Get all customers with stats
+    async getCustomers() {
+        await this.initialize();
+        return await this.db.getCustomersWithStats();
+    }
+
+    // Get customer details
+    async getCustomerDetails(customerPhone) {
+        await this.initialize();
+        return await this.db.getCustomerDetails(customerPhone);
     }
 }
 
