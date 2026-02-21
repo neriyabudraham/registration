@@ -4,11 +4,17 @@ const cors = require('cors');
 const axios = require('axios');
 const mysql = require('mysql2/promise');
 const path = require('path');
+const cookieParser = require('cookie-parser');
+
+// Services
+const ContactSaverService = require('./src/services/contactSaver');
+const EncryptionService = require('./src/services/encryption');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // MySQL Connection Pool
@@ -25,6 +31,10 @@ const pool = mysql.createPool({
 
 // Config
 const config = {
+    baseUrl: process.env.BASE_URL || 'http://localhost:3000',
+    encryptionKey: process.env.ENCRYPTION_KEY || 'default-encryption-key-change-in-production',
+    jwtSecret: process.env.JWT_SECRET || 'jwt-secret-change-in-production',
+    database: process.env.MYSQL_DATABASE,
     google: {
         clientId: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -37,6 +47,21 @@ const config = {
         chatId: process.env.WHATSAPP_CHAT_ID
     }
 };
+
+// Initialize encryption service
+const encryption = new EncryptionService(config.encryptionKey);
+
+// Initialize Contact Saver Service
+const contactSaver = new ContactSaverService(pool, config);
+
+// Admin routes
+const adminRoutes = require('./src/routes/admin')(pool, config, contactSaver);
+app.use('/admin', adminRoutes);
+
+// Admin page
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
+});
 
 // Home page
 app.get('/', (req, res) => {
@@ -150,6 +175,10 @@ app.get('/callback', async (req, res) => {
             : cleanPhone;
         const password = cleanPhone.slice(-6);
 
+        // Encrypt tokens before saving
+        const encryptedAccessToken = encryption.encrypt(access_token);
+        const encryptedRefreshToken = encryption.encrypt(refresh_token);
+
         // Save to database
         const connection = await pool.getConnection();
         try {
@@ -163,7 +192,7 @@ app.get('/callback', async (req, res) => {
                     Hash = VALUES(Hash),
                     FullName = COALESCE(NULLIF(VALUES(FullName), ''), FullName),
                     Phone = COALESCE(NULLIF(VALUES(Phone), ''), Phone)
-            `, [email, formattedPhone, password, access_token, refresh_token, expires_in, email, formattedPhone, fullName]);
+            `, [email, formattedPhone, password, encryptedAccessToken, encryptedRefreshToken, expires_in, email, formattedPhone, fullName]);
 
             // Get user data for WhatsApp message
             const [rows] = await connection.execute(`
@@ -246,4 +275,15 @@ app.get('/health', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    
+    // Start contact saver scheduler - runs every minute
+    console.log('Starting contact saver scheduler (every 60 seconds)...');
+    setInterval(() => {
+        contactSaver.run().catch(err => console.error('Contact saver error:', err));
+    }, 60 * 1000);
+    
+    // Run immediately on startup (after 10 seconds to let everything initialize)
+    setTimeout(() => {
+        contactSaver.run().catch(err => console.error('Initial contact saver error:', err));
+    }, 10000);
 });
