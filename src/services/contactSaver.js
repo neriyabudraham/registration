@@ -329,24 +329,42 @@ class ContactSaverService {
                     existed: 0
                 };
                 
+                // Check if this customer has a phone column in any table
+                if (!customer.Phone) {
+                    stats.customers.push(customerStats);
+                    continue;
+                }
+                
                 // Count contacts per status for this customer
                 for (const table of tables) {
                     try {
+                        // First check if column exists
+                        const [columns] = await connection.execute(`
+                            SELECT COLUMN_NAME 
+                            FROM information_schema.COLUMNS 
+                            WHERE TABLE_SCHEMA = ? 
+                            AND TABLE_NAME = ? 
+                            AND COLUMN_NAME = ?
+                        `, [this.config.database, table, customer.Phone]);
+                        
+                        if (columns.length === 0) continue;
+                        
+                        // Count by status
                         const [counts] = await connection.execute(`
                             SELECT 
-                                SUM(CASE WHEN \`${customer.Phone}\` = 0 THEN 1 ELSE 0 END) as pending,
-                                SUM(CASE WHEN \`${customer.Phone}\` = 1 THEN 1 ELSE 0 END) as saved,
-                                SUM(CASE WHEN \`${customer.Phone}\` = 2 THEN 1 ELSE 0 END) as existed
+                                CAST(COALESCE(SUM(CASE WHEN \`${customer.Phone}\` = 0 THEN 1 ELSE 0 END), 0) AS SIGNED) as pending,
+                                CAST(COALESCE(SUM(CASE WHEN \`${customer.Phone}\` = 1 THEN 1 ELSE 0 END), 0) AS SIGNED) as saved,
+                                CAST(COALESCE(SUM(CASE WHEN \`${customer.Phone}\` = 2 THEN 1 ELSE 0 END), 0) AS SIGNED) as existed
                             FROM \`${table}\`
                         `);
                         
                         if (counts[0]) {
-                            customerStats.pending += counts[0].pending || 0;
-                            customerStats.saved += counts[0].saved || 0;
-                            customerStats.existed += counts[0].existed || 0;
+                            customerStats.pending += Number(counts[0].pending) || 0;
+                            customerStats.saved += Number(counts[0].saved) || 0;
+                            customerStats.existed += Number(counts[0].existed) || 0;
                         }
                     } catch (e) {
-                        // Column might not exist
+                        console.error(`Error counting for ${customer.Phone} in ${table}:`, e.message);
                     }
                 }
                 
