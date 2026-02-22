@@ -283,6 +283,18 @@
             font-weight: 600;
         }
         
+        /* Error styling */
+        .customer-card.has-error {
+            border: 2px solid var(--danger);
+        }
+        .error-banner {
+            background: #fef2f2;
+            color: var(--danger);
+            padding: 0.75rem 1rem;
+            border-top: 1px solid #fecaca;
+            border-bottom: 1px solid #fecaca;
+        }
+        
         /* Campaign Cards */
         .campaign-card {
             background: var(--white);
@@ -591,6 +603,19 @@
             return name ? name.replace(/_/g, ' ') : '';
         }
         
+        // Format error type to Hebrew
+        function formatErrorType(errorType) {
+            const errorTypes = {
+                'TOKEN_INVALID': '🔑 טוקן לא תקין',
+                'PERMISSION_DENIED': '🚫 אין הרשאה',
+                'RATE_LIMIT': '⏱️ מגבלת קצב',
+                'RATE_LIMIT_TEMPORARY': '⏱️ מגבלת קצב זמנית',
+                'CONTACT_LIMIT_EXCEEDED': '📇 מגבלת אנשי קשר',
+                'UNKNOWN_ERROR': '❌ שגיאה'
+            };
+            return errorTypes[errorType] || errorType || 'שגיאה';
+        }
+        
         async function init() {
             const urlParams = new URLSearchParams(window.location.search);
             const error = urlParams.get('error');
@@ -765,7 +790,7 @@
             }
             
             grid.innerHTML = customers.map(c => `
-                <div class="customer-card" onclick="openCustomerDetail('${c.phone}')">
+                <div class="customer-card ${c.last_error ? 'has-error' : ''}" onclick="openCustomerDetail('${c.phone}')">
                     <div class="customer-card-header">
                         <div class="customer-info">
                             <h3>${c.full_name || 'ללא שם'}</h3>
@@ -773,9 +798,15 @@
                         </div>
                         <div class="customer-status">
                             ${c.has_valid_tokens ? '<span class="badge badge-success">מחובר</span>' : '<span class="badge badge-warning">לא מחובר</span>'}
-                            ${c.last_error ? '<span class="badge badge-danger">שגיאה</span>' : ''}
+                            ${c.google_contact_count !== null && c.google_contact_count !== undefined ? `<span class="badge" style="background: #e0e7ff; color: #3730a3;">📇 ${c.google_contact_count}</span>` : ''}
                         </div>
                     </div>
+                    ${c.last_error ? `
+                    <div class="error-banner">
+                        <strong>⚠️ ${formatErrorType(c.last_error_type)}</strong>
+                        <div style="font-size: 0.8rem; margin-top: 2px;">${c.last_error}</div>
+                    </div>
+                    ` : ''}
                     <div class="customer-card-stats">
                         <div class="mini-stat">
                             <div class="label">קמפיינים</div>
@@ -865,12 +896,29 @@
             
             let html = '';
             
+            // Customer info header
+            html += `
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                    ${customer.google_contact_count !== null && customer.google_contact_count !== undefined ? 
+                        `<div class="badge" style="background: #e0e7ff; color: #3730a3; font-size: 1rem; padding: 0.5rem 1rem;">
+                            📇 ${customer.google_contact_count} אנשי קשר בחשבון
+                        </div>` : ''
+                    }
+                    ${customer.has_valid_tokens ? 
+                        '<span class="badge badge-success" style="font-size: 0.9rem;">✅ מחובר</span>' : 
+                        '<span class="badge badge-warning" style="font-size: 0.9rem;">❌ לא מחובר</span>'
+                    }
+                </div>
+            `;
+            
             // Error alert with details
             if (customer.last_error) {
                 html += `
-                    <div class="error-alert">
-                        <div class="type">⚠️ ${customer.last_error_type || 'שגיאה'}</div>
-                        <div class="message">${customer.last_error}</div>
+                    <div class="error-alert" style="background: #fef2f2; border: 2px solid var(--danger); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                        <div style="font-size: 1.1rem; font-weight: 600; color: var(--danger); margin-bottom: 0.5rem;">
+                            ${formatErrorType(customer.last_error_type)}
+                        </div>
+                        <div style="color: #991b1b;">${customer.last_error}</div>
                     </div>
                 `;
             }

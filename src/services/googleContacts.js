@@ -386,23 +386,73 @@ class GoogleContactsService {
             return { status: 'created', contact: newContact, savedName: uniqueName };
             
         } catch (error) {
-            // Check for rate limit
+            const errorData = error.response?.data?.error;
+            const errorMessage = errorData?.message || error.message;
+            const errorStatus = errorData?.status || error.response?.status;
+            
+            // Check for rate limit (429)
             if (error.response?.status === 429) {
                 const retryAfter = error.response.headers['retry-after'] || 60;
-                throw { code: 'RATE_LIMIT', retryAfter: parseInt(retryAfter) };
+                throw { 
+                    code: 'RATE_LIMIT_TEMPORARY', 
+                    message: `מגבלת קצב זמנית - המתן ${retryAfter} שניות`,
+                    retryAfter: parseInt(retryAfter) 
+                };
             }
             
-            // Check for permission issues
+            // Check for quota exceeded (usually 403 with specific message)
             if (error.response?.status === 403) {
-                throw { code: 'PERMISSION_DENIED', message: error.response?.data?.error?.message };
+                // Check if it's a contact limit issue
+                if (errorMessage?.includes('quota') || errorMessage?.includes('limit') || errorMessage?.includes('RESOURCE_EXHAUSTED')) {
+                    throw { 
+                        code: 'CONTACT_LIMIT_EXCEEDED', 
+                        message: 'החשבון הגיע למגבלת אנשי קשר - יש למחוק אנשי קשר ישנים'
+                    };
+                }
+                throw { 
+                    code: 'PERMISSION_DENIED', 
+                    message: errorMessage || 'אין הרשאה לגשת לאנשי הקשר'
+                };
             }
             
             // Check for invalid token
             if (error.message === 'TOKEN_REFRESH_FAILED') {
-                throw { code: 'TOKEN_INVALID', message: 'Unable to refresh access token' };
+                throw { 
+                    code: 'TOKEN_INVALID', 
+                    message: 'לא ניתן לרענן את הטוקן - יש להתחבר מחדש'
+                };
             }
             
-            throw { code: 'UNKNOWN_ERROR', message: error.message };
+            // Check for 400 errors (bad request - often quota)
+            if (error.response?.status === 400) {
+                if (errorMessage?.includes('quota') || errorMessage?.includes('limit')) {
+                    throw { 
+                        code: 'CONTACT_LIMIT_EXCEEDED', 
+                        message: 'החשבון הגיע למגבלת אנשי קשר'
+                    };
+                }
+            }
+            
+            throw { 
+                code: 'UNKNOWN_ERROR', 
+                message: errorMessage || error.message || 'שגיאה לא ידועה'
+            };
+        }
+    }
+
+    // Get total contact count in the account
+    async getContactCount() {
+        try {
+            const response = await this.makeRequest(
+                'GET',
+                `${this.baseUrl}/people/me/connections?pageSize=1&personFields=names`
+            );
+            
+            // The totalPeople field gives us the count
+            return response.data.totalPeople || response.data.totalItems || 0;
+        } catch (error) {
+            console.error('Get contact count error:', error.response?.data || error.message);
+            return null; // Return null on error, not 0
         }
     }
 }

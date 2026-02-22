@@ -195,7 +195,9 @@ class ContactSaverService {
         const errorMessages = {
             'TOKEN_INVALID': 'טוקן לא תקין - נדרשת התחברות מחדש',
             'PERMISSION_DENIED': 'חסרות הרשאות לשמירת אנשי קשר',
-            'RATE_LIMIT': 'הגעת למגבלת שמירה - ממתין',
+            'RATE_LIMIT': 'מגבלת קצב זמנית',
+            'RATE_LIMIT_TEMPORARY': 'מגבלת קצב זמנית - ממתין',
+            'CONTACT_LIMIT_EXCEEDED': 'החשבון הגיע למגבלת אנשי קשר - יש למחוק אנשי קשר',
             'UNKNOWN_ERROR': 'שגיאה לא ידועה'
         };
 
@@ -257,6 +259,12 @@ class ContactSaverService {
             this.config.google.clientSecret
         );
         
+        // Get contact count in the account
+        const contactCount = await googleService.getContactCount();
+        if (contactCount !== null) {
+            await this.db.updateCustomerContactCount(customerPhone, contactCount);
+        }
+        
         let savedCount = 0;
         let existedCount = 0;
         let errorCount = 0;
@@ -307,25 +315,36 @@ class ContactSaverService {
                 } catch (error) {
                     errorCount++;
                     
+                    const errorCode = error.code || 'UNKNOWN_ERROR';
+                    const errorMsg = error.message || 'שגיאה לא ידועה';
+                    
                     // Log error
                     await this.db.logSaveAttempt(
                         customerPhone, tableName, contact.Phone, contact.FullName, 
-                        'error', error.message || error.code
+                        'error', `${errorCode}: ${errorMsg}`
                     );
                     
-                    if (error.code === 'RATE_LIMIT') {
+                    // Handle rate limit (temporary)
+                    if (errorCode === 'RATE_LIMIT_TEMPORARY') {
                         const waitMs = (error.retryAfter || 60) * 1000;
                         this.rateLimitedCustomers.set(customerPhone, Date.now() + waitMs);
-                        await this.sendErrorNotification(customerPhone, 'RATE_LIMIT', `ממתין ${error.retryAfter} שניות`);
+                        await this.sendErrorNotification(customerPhone, errorCode, errorMsg, customer.FullName);
                         break;
                     }
                     
-                    if (error.code === 'TOKEN_INVALID' || error.code === 'PERMISSION_DENIED') {
-                        await this.sendErrorNotification(customerPhone, error.code, error.message);
+                    // Handle contact limit exceeded (permanent until contacts deleted)
+                    if (errorCode === 'CONTACT_LIMIT_EXCEEDED') {
+                        await this.sendErrorNotification(customerPhone, errorCode, errorMsg, customer.FullName);
+                        break; // Stop processing this customer
+                    }
+                    
+                    // Handle token/permission errors
+                    if (errorCode === 'TOKEN_INVALID' || errorCode === 'PERMISSION_DENIED') {
+                        await this.sendErrorNotification(customerPhone, errorCode, errorMsg, customer.FullName);
                         break;
                     }
                     
-                    console.error(`Error saving contact for ${customerPhone}:`, error);
+                    console.error(`Error saving contact for ${customerPhone}:`, errorCode, errorMsg);
                 }
             }
             

@@ -222,6 +222,25 @@ class DatabaseService {
         }
     }
 
+    // Update customer contact count
+    async updateCustomerContactCount(customerPhone, contactCount) {
+        const connection = await this.pool.getConnection();
+        try {
+            // First ensure the column exists
+            await connection.execute(`
+                ALTER TABLE cs_customers ADD COLUMN IF NOT EXISTS google_contact_count INT DEFAULT NULL
+            `).catch(() => {}); // Ignore if already exists
+            
+            await connection.execute(`
+                UPDATE cs_customers 
+                SET google_contact_count = ?, updated_at = NOW()
+                WHERE phone = ?
+            `, [contactCount, customerPhone]);
+        } finally {
+            connection.release();
+        }
+    }
+
     // Get all campaign tables (with fresh schema)
     async getCampaignTables() {
         const connection = await this.pool.getConnection();
@@ -366,9 +385,9 @@ class DatabaseService {
                 // Get real-time stats
                 const stats = await this.getRealTimeCustomerStats(phone);
 
-                // Get error info from our tracking table
+                // Get error info and contact count from our tracking table
                 const [errorRows] = await connection.execute(`
-                    SELECT last_error, last_error_type FROM cs_customers WHERE phone = ?
+                    SELECT last_error, last_error_type, google_contact_count FROM cs_customers WHERE phone = ?
                 `, [phone]);
 
                 // Get last hour saved from our log
@@ -390,6 +409,7 @@ class DatabaseService {
                     has_valid_tokens: custInfo.has_valid_tokens === 1,
                     last_error: errorInfo.last_error,
                     last_error_type: errorInfo.last_error_type,
+                    google_contact_count: errorInfo.google_contact_count,
                     total_contacts: stats.total_contacts,
                     total_pending: stats.total_pending,
                     total_saved: stats.total_saved,
@@ -569,9 +589,9 @@ class DatabaseService {
                 FROM לקוחות WHERE Phone = ?
             `, [customerPhone]);
 
-            // Get error info from our tracking table
+            // Get error info and contact count from our tracking table
             const [errorRows] = await connection.execute(`
-                SELECT last_error, last_error_type, error_notified FROM cs_customers WHERE phone = ?
+                SELECT last_error, last_error_type, error_notified, google_contact_count FROM cs_customers WHERE phone = ?
             `, [customerPhone]);
 
             const custInfo = custRows[0] || {};
@@ -584,7 +604,8 @@ class DatabaseService {
                 group_id: custInfo.GroupID,
                 has_valid_tokens: custInfo.has_valid_tokens === 1,
                 last_error: errorInfo.last_error,
-                last_error_type: errorInfo.last_error_type
+                last_error_type: errorInfo.last_error_type,
+                google_contact_count: errorInfo.google_contact_count
             };
 
             // Get REAL-TIME campaign stats
