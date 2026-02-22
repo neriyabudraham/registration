@@ -480,6 +480,13 @@ class DatabaseService {
                     SELECT last_error, last_error_type, google_contact_count, has_valid_tokens as cs_valid_tokens FROM cs_customers WHERE phone = ?
                 `, [phone]);
 
+                // Also check for the most recent activity in save_log
+                const [recentActivity] = await connection.execute(`
+                    SELECT status, error_message, processed_at FROM cs_save_log 
+                    WHERE customer_phone = ? 
+                    ORDER BY processed_at DESC LIMIT 1
+                `, [phone]);
+
                 // Get last hour saved from our log
                 const [hourStats] = await connection.execute(`
                     SELECT COALESCE(SUM(saved_count), 0) as last_hour_saved
@@ -490,16 +497,25 @@ class DatabaseService {
 
                 const custInfo = custRows[0] || {};
                 const errorInfo = errorRows[0] || {};
+                const lastActivity = recentActivity[0];
                 
-                // Use error from cs_customers (which is cleared on successful saves)
-                const lastError = errorInfo.last_error;
-                const lastErrorType = errorInfo.last_error_type;
+                // Determine error state:
+                // 1. If cs_customers has error, use it
+                // 2. If not but last activity was an error, use that
+                let lastError = errorInfo.last_error;
+                let lastErrorType = errorInfo.last_error_type;
+                
+                if (!lastError && lastActivity?.status === 'error' && lastActivity.error_message) {
+                    lastError = lastActivity.error_message;
+                    lastErrorType = lastActivity.error_message?.split(':')[0] || 'UNKNOWN_ERROR';
+                }
                 
                 // Check if it's a token error
                 const isTokenError = lastErrorType === 'TOKEN_INVALID' || lastErrorType === 'PERMISSION_DENIED';
                 
-                // has_valid_tokens from cs_customers (updated on success/error)
-                const hasValidTokens = errorInfo.cs_valid_tokens === 0 ? false : custInfo.has_valid_tokens === 1;
+                // has_valid_tokens: false if cs_customers says so, or if there's a token error, or if לקוחות doesn't have tokens
+                const hasValidTokens = errorInfo.cs_valid_tokens === 0 ? false : 
+                                       (isTokenError ? false : custInfo.has_valid_tokens === 1);
 
                 customers.push({
                     phone: phone,

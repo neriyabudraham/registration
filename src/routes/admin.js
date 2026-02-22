@@ -616,27 +616,68 @@ ${link}
         }
     });
 
-    // Get all customers with active errors (errors that weren't resolved by successful saves)
+    // Get all customers with active errors (from cs_customers or whose last save_log entry was an error)
     router.get('/customers-with-errors', verifyAdmin, async (req, res) => {
         const connection = await pool.getConnection();
         try {
-            // Get customers with errors - check if their last activity was an error (not a success)
+            // Get customers whose most recent activity was an error
             const [customers] = await connection.execute(`
-                SELECT 
-                    c.phone,
-                    COALESCE(c.full_name, cust.FullName) as full_name,
-                    COALESCE(c.email, cust.Email) as email,
-                    c.last_error,
-                    c.last_error_type,
-                    c.google_contact_count,
-                    c.updated_at
-                FROM cs_customers c
-                LEFT JOIN לקוחות cust ON cust.Phone = c.phone
-                WHERE c.last_error IS NOT NULL
-                ORDER BY c.updated_at DESC
+                SELECT DISTINCT
+                    sub.phone,
+                    sub.full_name,
+                    sub.email,
+                    sub.last_error,
+                    sub.last_error_type,
+                    sub.google_contact_count,
+                    sub.updated_at
+                FROM (
+                    -- Customers with errors in cs_customers
+                    SELECT 
+                        c.phone,
+                        COALESCE(c.full_name, cust.FullName) as full_name,
+                        COALESCE(c.email, cust.Email) as email,
+                        c.last_error,
+                        c.last_error_type,
+                        c.google_contact_count,
+                        c.updated_at
+                    FROM cs_customers c
+                    LEFT JOIN לקוחות cust ON cust.Phone = c.phone
+                    WHERE c.last_error IS NOT NULL
+                    
+                    UNION ALL
+                    
+                    -- Customers whose last log entry was an error (and not in cs_customers with error)
+                    SELECT 
+                        l.customer_phone as phone,
+                        cust.FullName as full_name,
+                        cust.Email as email,
+                        l.error_message as last_error,
+                        SUBSTRING_INDEX(l.error_message, ':', 1) as last_error_type,
+                        cs.google_contact_count,
+                        l.processed_at as updated_at
+                    FROM cs_save_log l
+                    INNER JOIN (
+                        SELECT customer_phone, MAX(processed_at) as max_time
+                        FROM cs_save_log
+                        GROUP BY customer_phone
+                    ) latest ON l.customer_phone = latest.customer_phone AND l.processed_at = latest.max_time
+                    LEFT JOIN לקוחות cust ON cust.Phone = l.customer_phone
+                    LEFT JOIN cs_customers cs ON cs.phone = l.customer_phone
+                    WHERE l.status = 'error'
+                    AND (cs.last_error IS NULL OR cs.phone IS NULL)
+                ) sub
+                ORDER BY sub.updated_at DESC
             `);
             
-            res.json(customers);
+            // Deduplicate by phone (keep first occurrence which is most recent)
+            const seen = new Set();
+            const unique = customers.filter(c => {
+                if (seen.has(c.phone)) return false;
+                seen.add(c.phone);
+                return true;
+            });
+            
+            res.json(unique);
         } catch (error) {
             console.error('Get customers with errors:', error);
             res.status(500).json({ error: 'Failed to get customers' });
