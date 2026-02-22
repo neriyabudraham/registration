@@ -21,10 +21,20 @@ class GoogleContactsService {
         '|', '_', ';', '`', '\\', '\t'
     ];
 
-    // Sanitize contact name with all rules
+    // Get date suffix MM/YY
+    getDateSuffix() {
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = String(now.getFullYear()).slice(-2);
+        return `${month}/${year}`;
+    }
+
+    // Sanitize contact name with all rules and add date suffix
     sanitizeName(name, defaultName = 'צופה') {
+        const dateSuffix = this.getDateSuffix();
+        
         if (!name || typeof name !== 'string') {
-            return this.generateDefaultName(defaultName);
+            return `${defaultName} ${dateSuffix}`;
         }
 
         let cleaned = name;
@@ -61,18 +71,19 @@ class GoogleContactsService {
         // Trim
         cleaned = cleaned.trim();
 
-        // Max 40 characters
-        if (cleaned.length > 40) {
-            cleaned = cleaned.substring(0, 40).trim();
+        // Max 35 characters (leave room for date suffix)
+        if (cleaned.length > 35) {
+            cleaned = cleaned.substring(0, 35).trim();
         }
 
         // Validate: must have at least 2 consecutive Hebrew or English letters
         const hasValidChars = /[a-zA-Zא-ת]{2,}/.test(cleaned);
         if (!hasValidChars || cleaned.length < 2) {
-            return this.generateDefaultName(defaultName);
+            return `${defaultName} ${dateSuffix}`;
         }
 
-        return cleaned;
+        // Add date suffix to the name
+        return `${cleaned} ${dateSuffix}`;
     }
 
     // Generate default name with date suffix

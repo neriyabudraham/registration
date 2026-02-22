@@ -350,13 +350,36 @@ module.exports = (pool, config, contactSaver) => {
         const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`;
         const fullLabel = `${formattedLabel} ${dateStr}`;
         
+        // Characters to remove (same as googleContacts.js)
+        const charsToRemove = ['=', '*', ',', '•', '°', '>', '<', '~', '@', '#', '$', '%', '^', '₪',
+            '{', '}', '[', ']', '+', '&', '!', '|', '_', ';', '`', '\\', '\t', '?'];
+        
         let vcf = '';
         for (const contact of contacts) {
-            // Clean and format name
+            // Clean and format name (same rules as googleContacts.js)
             let name = contact.FullName || contact.name || 'צופה';
-            name = name.replace(/[^\u0590-\u05FFa-zA-Z0-9\s\-'".]/g, '').trim();
-            if (name.length < 2) name = `צופה ${dateStr}`;
-            if (name.length > 40) name = name.substring(0, 40).trim();
+            
+            // Remove special chars
+            for (const char of charsToRemove) {
+                name = name.split(char).join('');
+            }
+            name = name.replace(/[\r\n]+/g, ' '); // newlines to space
+            name = name.replace(/^[0-9]+/, ''); // remove leading numbers
+            name = name.replace(/^[\.\-_״"'\s]+/, ''); // remove leading special
+            name = name.replace(/[\.\-_״"'\s\|!]+$/, ''); // remove trailing special
+            name = name.replace(/[()]/g, ''); // remove parentheses
+            name = name.replace(/\s{2,}/g, ' '); // double spaces
+            name = name.trim();
+            
+            // Validate and set default if needed
+            const hasValidChars = /[a-zA-Zא-ת]{2,}/.test(name);
+            if (!hasValidChars || name.length < 2) {
+                name = 'צופה';
+            }
+            if (name.length > 35) name = name.substring(0, 35).trim();
+            
+            // Add date suffix
+            name = `${name} ${dateStr}`;
             
             // Format phone
             let phone = contact.Phone || contact.phone || '';
