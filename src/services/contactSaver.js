@@ -638,6 +638,8 @@ class ContactSaverService {
                     const accessToken = this.encryption.decrypt(account.AccessToken) || account.AccessToken;
                     const refreshToken = this.encryption.decrypt(account.RefreshToken) || account.RefreshToken;
                     
+                    console.log(`Fetching count for: ${account.Email} (phone: ${account.Phone})`);
+                    
                     // Create Google service
                     const googleService = new GoogleContactsService(
                         accessToken,
@@ -648,10 +650,12 @@ class ContactSaverService {
                     
                     // Get contact count
                     const contactCount = await googleService.getContactCount();
+                    console.log(`  -> ${account.Email}: ${contactCount} contacts`);
                     
                     if (contactCount !== null) {
                         // Update per-account count
                         await this.db.updateAccountContactCount(account.Phone, account.Email, contactCount);
+                        console.log(`  -> Saved to cs_accounts: phone=${account.Phone}, email=${account.Email}, count=${contactCount}`);
                         updated++;
                         
                         // Check if over limit for this account
