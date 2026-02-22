@@ -222,61 +222,165 @@ class DatabaseService {
         }
     }
 
-    // Get all customers with summary stats (ONLY customers that appear in campaigns)
+    // Get all campaign tables
+    async getCampaignTables() {
+        const connection = await this.pool.getConnection();
+        try {
+            const [tables] = await connection.execute(`
+                SELECT TABLE_NAME 
+                FROM information_schema.TABLES 
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND (TABLE_NAME LIKE 'הגרלה%' OR TABLE_NAME LIKE 'הגרלת%' OR TABLE_NAME LIKE 'שמירת\\_אנשי\\_קשר%')
+            `);
+            return tables.map(t => t.TABLE_NAME);
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Get phone columns from a table (customer phone numbers)
+    async getPhoneColumns(tableName) {
+        const connection = await this.pool.getConnection();
+        try {
+            const [columns] = await connection.execute(`
+                SELECT COLUMN_NAME 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = ? 
+                AND COLUMN_NAME REGEXP '^972[0-9]{9}$'
+            `, [tableName]);
+            return columns.map(c => c.COLUMN_NAME);
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Get REAL-TIME stats for a customer from source tables
+    async getRealTimeCustomerStats(customerPhone) {
+        const connection = await this.pool.getConnection();
+        try {
+            const tables = await this.getCampaignTables();
+            const campaigns = [];
+            let totalPending = 0, totalSaved = 0, totalExisted = 0, totalContacts = 0;
+
+            for (const table of tables) {
+                // Check if this customer has a column in this table
+                const phoneColumns = await this.getPhoneColumns(table);
+                if (!phoneColumns.includes(customerPhone)) continue;
+
+                try {
+                    const [stats] = await connection.execute(`
+                        SELECT 
+                            COUNT(*) as total,
+                            CAST(SUM(CASE WHEN \`${customerPhone}\` = 0 THEN 1 ELSE 0 END) AS SIGNED) as pending,
+                            CAST(SUM(CASE WHEN \`${customerPhone}\` = 1 THEN 1 ELSE 0 END) AS SIGNED) as saved,
+                            CAST(SUM(CASE WHEN \`${customerPhone}\` = 2 THEN 1 ELSE 0 END) AS SIGNED) as existed
+                        FROM \`${table}\`
+                    `);
+
+                    const s = stats[0];
+                    const pending = Number(s.pending) || 0;
+                    const saved = Number(s.saved) || 0;
+                    const existed = Number(s.existed) || 0;
+                    const total = Number(s.total) || 0;
+
+                    campaigns.push({
+                        campaign_name: table,
+                        total_contacts: total,
+                        pending_count: pending,
+                        saved_count: saved,
+                        existed_count: existed
+                    });
+
+                    totalPending += pending;
+                    totalSaved += saved;
+                    totalExisted += existed;
+                    totalContacts += total;
+                } catch (e) {
+                    // Column might not exist properly
+                }
+            }
+
+            return {
+                campaigns,
+                total_contacts: totalContacts,
+                total_pending: totalPending,
+                total_saved: totalSaved,
+                total_existed: totalExisted,
+                campaign_count: campaigns.length
+            };
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Get all customers with REAL-TIME stats from source tables
     async getCustomersWithStats() {
         const connection = await this.pool.getConnection();
         try {
-            // Only get customers that have campaign stats (meaning they appear in campaigns)
-            const [customers] = await connection.execute(`
-                SELECT 
-                    c.*,
-                    COALESCE(SUM(s.total_contacts), 0) as total_contacts,
-                    COALESCE(SUM(s.pending_count), 0) as total_pending,
-                    COALESCE(SUM(s.saved_count), 0) as total_saved,
-                    COALESCE(SUM(s.existed_count), 0) as total_existed,
-                    COUNT(DISTINCT s.campaign_name) as campaign_count,
-                    MAX(s.last_processed) as last_activity
-                FROM cs_customers c
-                INNER JOIN cs_campaign_stats s ON c.phone = s.customer_phone
-                WHERE c.is_active = TRUE
-                GROUP BY c.id
-                HAVING campaign_count > 0
-            `);
+            // First, get all unique customer phones from campaign tables
+            const tables = await this.getCampaignTables();
+            const allCustomerPhones = new Set();
 
-            // Get last hour and last month saves for each customer
-            for (const customer of customers) {
-                // Last hour
+            for (const table of tables) {
+                const phoneColumns = await this.getPhoneColumns(table);
+                phoneColumns.forEach(p => allCustomerPhones.add(p));
+            }
+
+            if (allCustomerPhones.size === 0) {
+                return [];
+            }
+
+            const customers = [];
+
+            for (const phone of allCustomerPhones) {
+                // Get customer info from לקוחות table
+                const [custRows] = await connection.execute(`
+                    SELECT Phone, Email, FullName, GroupID, 
+                           CASE WHEN AccessToken IS NOT NULL AND RefreshToken IS NOT NULL THEN 1 ELSE 0 END as has_valid_tokens
+                    FROM לקוחות WHERE Phone = ?
+                `, [phone]);
+
+                // Get real-time stats
+                const stats = await this.getRealTimeCustomerStats(phone);
+
+                // Get error info from our tracking table
+                const [errorRows] = await connection.execute(`
+                    SELECT last_error, last_error_type FROM cs_customers WHERE phone = ?
+                `, [phone]);
+
+                // Get last hour saved from our log
                 const [hourStats] = await connection.execute(`
                     SELECT COALESCE(SUM(saved_count), 0) as last_hour_saved
                     FROM cs_hourly_stats
                     WHERE customer_phone = ?
                     AND hour_timestamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
-                `, [customer.phone]);
-                customer.last_hour_saved = Number(hourStats[0]?.last_hour_saved) || 0;
+                `, [phone]);
 
-                // Last month activity
-                const [monthStats] = await connection.execute(`
-                    SELECT COALESCE(SUM(saved_count + existed_count), 0) as last_month_activity
-                    FROM cs_hourly_stats
-                    WHERE customer_phone = ?
-                    AND hour_timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                `, [customer.phone]);
-                customer.last_month_activity = Number(monthStats[0]?.last_month_activity) || 0;
+                const custInfo = custRows[0] || {};
+                const errorInfo = errorRows[0] || {};
+
+                customers.push({
+                    phone: phone,
+                    email: custInfo.Email,
+                    full_name: custInfo.FullName,
+                    group_id: custInfo.GroupID,
+                    has_valid_tokens: custInfo.has_valid_tokens === 1,
+                    last_error: errorInfo.last_error,
+                    last_error_type: errorInfo.last_error_type,
+                    total_contacts: stats.total_contacts,
+                    total_pending: stats.total_pending,
+                    total_saved: stats.total_saved,
+                    total_existed: stats.total_existed,
+                    campaign_count: stats.campaign_count,
+                    last_hour_saved: Number(hourStats[0]?.last_hour_saved) || 0
+                });
             }
 
-            // Sort: prioritize customers with pending OR recent activity
+            // Sort: prioritize customers with pending contacts
             customers.sort((a, b) => {
-                const aPending = Number(a.total_pending) || 0;
-                const bPending = Number(b.total_pending) || 0;
-                const aMonthActivity = a.last_month_activity || 0;
-                const bMonthActivity = b.last_month_activity || 0;
-                const aCampaigns = Number(a.campaign_count) || 0;
-                const bCampaigns = Number(b.campaign_count) || 0;
-                
-                // Priority score: pending > recent activity > campaigns > connected
-                const aScore = (aPending > 0 ? 10000 : 0) + (aMonthActivity * 10) + (aCampaigns * 100) + (a.has_valid_tokens ? 50 : 0);
-                const bScore = (bPending > 0 ? 10000 : 0) + (bMonthActivity * 10) + (bCampaigns * 100) + (b.has_valid_tokens ? 50 : 0);
-                
+                const aScore = (a.total_pending > 0 ? 10000 : 0) + a.total_saved + (a.has_valid_tokens ? 100 : 0);
+                const bScore = (b.total_pending > 0 ? 10000 : 0) + b.total_saved + (b.has_valid_tokens ? 100 : 0);
                 return bScore - aScore;
             });
 
@@ -286,23 +390,50 @@ class DatabaseService {
         }
     }
 
-    // Get all campaigns with stats
+    // Get all campaigns with REAL-TIME stats from source tables
     async getCampaignsWithStats() {
         const connection = await this.pool.getConnection();
         try {
-            const [campaigns] = await connection.execute(`
-                SELECT 
-                    campaign_name,
-                    COUNT(DISTINCT customer_phone) as customer_count,
-                    SUM(total_contacts) as total_contacts,
-                    SUM(pending_count) as total_pending,
-                    SUM(saved_count) as total_saved,
-                    SUM(existed_count) as total_existed,
-                    MAX(last_processed) as last_activity
-                FROM cs_campaign_stats
-                GROUP BY campaign_name
-                ORDER BY total_pending DESC, last_activity DESC
-            `);
+            const tables = await this.getCampaignTables();
+            const campaigns = [];
+
+            for (const table of tables) {
+                const phoneColumns = await this.getPhoneColumns(table);
+                if (phoneColumns.length === 0) continue;
+
+                let totalPending = 0, totalSaved = 0, totalExisted = 0, totalContacts = 0;
+
+                // Get stats for all customers in this campaign
+                for (const phone of phoneColumns) {
+                    try {
+                        const [stats] = await connection.execute(`
+                            SELECT 
+                                COUNT(*) as total,
+                                CAST(SUM(CASE WHEN \`${phone}\` = 0 THEN 1 ELSE 0 END) AS SIGNED) as pending,
+                                CAST(SUM(CASE WHEN \`${phone}\` = 1 THEN 1 ELSE 0 END) AS SIGNED) as saved,
+                                CAST(SUM(CASE WHEN \`${phone}\` = 2 THEN 1 ELSE 0 END) AS SIGNED) as existed
+                            FROM \`${table}\`
+                        `);
+
+                        totalPending += Number(stats[0].pending) || 0;
+                        totalSaved += Number(stats[0].saved) || 0;
+                        totalExisted += Number(stats[0].existed) || 0;
+                        totalContacts = Number(stats[0].total) || 0; // Same for all columns
+                    } catch (e) {}
+                }
+
+                campaigns.push({
+                    campaign_name: table,
+                    customer_count: phoneColumns.length,
+                    total_contacts: totalContacts,
+                    total_pending: totalPending,
+                    total_saved: totalSaved,
+                    total_existed: totalExisted
+                });
+            }
+
+            // Sort by pending (most urgent first)
+            campaigns.sort((a, b) => b.total_pending - a.total_pending);
             
             return campaigns;
         } finally {
@@ -310,32 +441,78 @@ class DatabaseService {
         }
     }
 
-    // Get campaign details with all customers
+    // Get campaign details with all customers (REAL-TIME)
     async getCampaignDetails(campaignName) {
         const connection = await this.pool.getConnection();
         try {
-            // Get all customers in this campaign
-            const [customers] = await connection.execute(`
-                SELECT 
-                    s.*,
-                    c.full_name,
-                    c.email,
-                    c.has_valid_tokens,
-                    c.last_error,
-                    c.last_error_type
-                FROM cs_campaign_stats s
-                JOIN cs_customers c ON s.customer_phone = c.phone
-                WHERE s.campaign_name = ?
-                ORDER BY s.pending_count DESC, s.saved_count DESC
-            `, [campaignName]);
+            const phoneColumns = await this.getPhoneColumns(campaignName);
+            if (phoneColumns.length === 0) return null;
+
+            const customers = [];
+            let summaryPending = 0, summarySaved = 0, summaryExisted = 0, summaryTotal = 0;
+
+            for (const phone of phoneColumns) {
+                // Get customer info
+                const [custRows] = await connection.execute(`
+                    SELECT Phone, Email, FullName,
+                           CASE WHEN AccessToken IS NOT NULL AND RefreshToken IS NOT NULL THEN 1 ELSE 0 END as has_valid_tokens
+                    FROM לקוחות WHERE Phone = ?
+                `, [phone]);
+
+                // Get error info
+                const [errorRows] = await connection.execute(`
+                    SELECT last_error, last_error_type FROM cs_customers WHERE phone = ?
+                `, [phone]);
+
+                // Get stats for this customer in this campaign
+                try {
+                    const [stats] = await connection.execute(`
+                        SELECT 
+                            COUNT(*) as total,
+                            CAST(SUM(CASE WHEN \`${phone}\` = 0 THEN 1 ELSE 0 END) AS SIGNED) as pending,
+                            CAST(SUM(CASE WHEN \`${phone}\` = 1 THEN 1 ELSE 0 END) AS SIGNED) as saved,
+                            CAST(SUM(CASE WHEN \`${phone}\` = 2 THEN 1 ELSE 0 END) AS SIGNED) as existed
+                        FROM \`${campaignName}\`
+                    `);
+
+                    const s = stats[0];
+                    const pending = Number(s.pending) || 0;
+                    const saved = Number(s.saved) || 0;
+                    const existed = Number(s.existed) || 0;
+                    const total = Number(s.total) || 0;
+
+                    const custInfo = custRows[0] || {};
+                    const errorInfo = errorRows[0] || {};
+
+                    customers.push({
+                        customer_phone: phone,
+                        full_name: custInfo.FullName,
+                        email: custInfo.Email,
+                        has_valid_tokens: custInfo.has_valid_tokens === 1,
+                        last_error: errorInfo.last_error,
+                        last_error_type: errorInfo.last_error_type,
+                        total_contacts: total,
+                        pending_count: pending,
+                        saved_count: saved,
+                        existed_count: existed
+                    });
+
+                    summaryPending += pending;
+                    summarySaved += saved;
+                    summaryExisted += existed;
+                    summaryTotal = total; // Same for all
+                } catch (e) {}
+            }
+
+            // Sort by pending
+            customers.sort((a, b) => b.pending_count - a.pending_count);
             
-            // Summary
             const summary = {
                 total_customers: customers.length,
-                total_contacts: customers.reduce((sum, c) => sum + c.total_contacts, 0),
-                total_pending: customers.reduce((sum, c) => sum + c.pending_count, 0),
-                total_saved: customers.reduce((sum, c) => sum + c.saved_count, 0),
-                total_existed: customers.reduce((sum, c) => sum + c.existed_count, 0)
+                total_contacts: summaryTotal,
+                total_pending: summaryPending,
+                total_saved: summarySaved,
+                total_existed: summaryExisted
             };
             
             return { campaign_name: campaignName, customers, summary };
@@ -344,25 +521,38 @@ class DatabaseService {
         }
     }
 
-    // Get customer details with all campaigns
+    // Get customer details with all campaigns (REAL-TIME from source tables)
     async getCustomerDetails(customerPhone) {
         const connection = await this.pool.getConnection();
         try {
-            // Get customer info
-            const [customers] = await connection.execute(`
-                SELECT * FROM cs_customers WHERE phone = ?
+            // Get customer info from לקוחות table
+            const [custRows] = await connection.execute(`
+                SELECT Phone, Email, FullName, GroupID, 
+                       CASE WHEN AccessToken IS NOT NULL AND RefreshToken IS NOT NULL THEN 1 ELSE 0 END as has_valid_tokens
+                FROM לקוחות WHERE Phone = ?
             `, [customerPhone]);
 
-            if (customers.length === 0) return null;
-
-            const customer = customers[0];
-
-            // Get campaign stats
-            const [campaigns] = await connection.execute(`
-                SELECT * FROM cs_campaign_stats 
-                WHERE customer_phone = ?
-                ORDER BY campaign_name
+            // Get error info from our tracking table
+            const [errorRows] = await connection.execute(`
+                SELECT last_error, last_error_type, error_notified FROM cs_customers WHERE phone = ?
             `, [customerPhone]);
+
+            const custInfo = custRows[0] || {};
+            const errorInfo = errorRows[0] || {};
+
+            const customer = {
+                phone: customerPhone,
+                email: custInfo.Email,
+                full_name: custInfo.FullName,
+                group_id: custInfo.GroupID,
+                has_valid_tokens: custInfo.has_valid_tokens === 1,
+                last_error: errorInfo.last_error,
+                last_error_type: errorInfo.last_error_type
+            };
+
+            // Get REAL-TIME campaign stats
+            const stats = await this.getRealTimeCustomerStats(customerPhone);
+            const campaigns = stats.campaigns;
 
             // Get recent activity (last 50)
             const [recentActivity] = await connection.execute(`
@@ -386,14 +576,16 @@ class DatabaseService {
             `, [customerPhone]);
 
             // Calculate summary
+            const lastHourSaved = hourlyStats
+                .filter(h => new Date(h.hour_timestamp) >= new Date(Date.now() - 3600000))
+                .reduce((sum, h) => sum + (h.saved_count || 0), 0);
+
             const summary = {
-                total_contacts: campaigns.reduce((sum, c) => sum + c.total_contacts, 0),
-                total_pending: campaigns.reduce((sum, c) => sum + c.pending_count, 0),
-                total_saved: campaigns.reduce((sum, c) => sum + c.saved_count, 0),
-                total_existed: campaigns.reduce((sum, c) => sum + c.existed_count, 0),
-                last_hour_saved: hourlyStats
-                    .filter(h => new Date(h.hour_timestamp) >= new Date(Date.now() - 3600000))
-                    .reduce((sum, h) => sum + h.saved_count, 0),
+                total_contacts: stats.total_contacts,
+                total_pending: stats.total_pending,
+                total_saved: stats.total_saved,
+                total_existed: stats.total_existed,
+                last_hour_saved: lastHourSaved,
                 has_error: !!customer.last_error
             };
 
@@ -409,24 +601,25 @@ class DatabaseService {
         }
     }
 
-    // Get dashboard summary
+    // Get dashboard summary (REAL-TIME from source tables)
     async getDashboardSummary() {
         const connection = await this.pool.getConnection();
         try {
-            const [summary] = await connection.execute(`
-                SELECT 
-                    COUNT(DISTINCT c.phone) as total_customers,
-                    SUM(CASE WHEN c.has_valid_tokens THEN 1 ELSE 0 END) as connected_customers,
-                    SUM(CASE WHEN c.last_error IS NOT NULL THEN 1 ELSE 0 END) as customers_with_errors,
-                    COALESCE(SUM(s.pending_count), 0) as total_pending,
-                    COALESCE(SUM(s.saved_count), 0) as total_saved,
-                    COALESCE(SUM(s.existed_count), 0) as total_existed
-                FROM cs_customers c
-                LEFT JOIN cs_campaign_stats s ON c.phone = s.customer_phone
-                WHERE c.is_active = TRUE
-            `);
+            // Get all customers with real-time stats
+            const customers = await this.getCustomersWithStats();
 
-            // Get last hour activity
+            let totalPending = 0, totalSaved = 0, totalExisted = 0;
+            let connectedCustomers = 0, customersWithErrors = 0;
+
+            for (const c of customers) {
+                totalPending += c.total_pending || 0;
+                totalSaved += c.total_saved || 0;
+                totalExisted += c.total_existed || 0;
+                if (c.has_valid_tokens) connectedCustomers++;
+                if (c.last_error) customersWithErrors++;
+            }
+
+            // Get last hour activity from log
             const [hourActivity] = await connection.execute(`
                 SELECT 
                     COALESCE(SUM(saved_count), 0) as last_hour_saved,
@@ -436,7 +629,12 @@ class DatabaseService {
             `);
 
             return {
-                ...summary[0],
+                total_customers: customers.length,
+                connected_customers: connectedCustomers,
+                customers_with_errors: customersWithErrors,
+                total_pending: totalPending,
+                total_saved: totalSaved,
+                total_existed: totalExisted,
                 last_hour_saved: Number(hourActivity[0]?.last_hour_saved) || 0,
                 last_hour_errors: Number(hourActivity[0]?.last_hour_errors) || 0
             };

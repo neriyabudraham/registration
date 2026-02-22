@@ -481,6 +481,7 @@
             <h1>📊 ניהול שמירת אנשי קשר</h1>
             <div class="header-actions">
                 <span id="autoSaveStatus" style="font-size: 0.85rem; color: var(--success);">🟢 שמירה אוטומטית פעילה</span>
+                <button onclick="loadData(); loadCampaigns();" class="btn btn-sm btn-primary">🔄 רענן</button>
                 <button onclick="migrateTokens()" class="btn btn-sm btn-outline">🔒 הצפן טוקנים</button>
                 <button onclick="logout()" class="btn btn-sm btn-danger">יציאה</button>
             </div>
@@ -679,6 +680,10 @@
         
         async function loadData() {
             try {
+                // Show refreshing indicator
+                const statusEl = document.getElementById('autoSaveStatus');
+                if (statusEl) statusEl.textContent = '🔄 מרענן...';
+                
                 const statusRes = await fetch(`${API_BASE}/status`, { credentials: 'include' });
                 if (!statusRes.ok) { if (statusRes.status === 401) location.reload(); return; }
                 const status = await statusRes.json();
@@ -693,7 +698,15 @@
                 const customersRes = await fetch(`${API_BASE}/customers`, { credentials: 'include' });
                 allCustomers = await customersRes.json();
                 renderCustomers(allCustomers);
-            } catch (e) { console.error('Load error:', e); }
+                
+                // Update refresh timestamp
+                const time = new Date().toLocaleTimeString('he-IL');
+                if (statusEl) statusEl.textContent = `🟢 עודכן: ${time}`;
+            } catch (e) { 
+                console.error('Load error:', e);
+                const statusEl = document.getElementById('autoSaveStatus');
+                if (statusEl) statusEl.textContent = '🔴 שגיאה בטעינה';
+            }
         }
         
         async function loadCampaigns() {
@@ -876,17 +889,7 @@
                 </div>
             `;
             
-            // Labels (campaign names as labels)
-            if (campaigns && campaigns.length > 0) {
-                html += `
-                    <div class="labels-section">
-                        <h3>🏷️ תוויות (${campaigns.length})</h3>
-                        <div class="labels-list">
-                            ${campaigns.map(c => `<span class="label-tag">${formatCampaignName(c.campaign_name)}</span>`).join('')}
-                        </div>
-                    </div>
-                `;
-            }
+            // Labels section removed - showing only campaigns table with real stats
             
             // Campaigns table
             if (campaigns && campaigns.length > 0) {
@@ -1040,9 +1043,10 @@
             alert(res.ok ? `הוצפנו: ${data.migrated}, כבר מוצפנים: ${data.skipped}` : 'שגיאה');
         }
         
+        // Auto-refresh every 10 seconds for real-time data
         setInterval(() => {
             if (document.getElementById('dashboard').classList.contains('active')) loadData();
-        }, 30000);
+        }, 10000);
         
         init();
     </script>

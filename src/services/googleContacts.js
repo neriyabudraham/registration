@@ -194,11 +194,19 @@ class GoogleContactsService {
         }
     }
 
+    // Format label name (replace _ with space)
+    formatLabelName(name) {
+        return name ? name.replace(/_/g, ' ') : name;
+    }
+
     // Main function: Save contact with label
     async saveContactWithLabel(name, phone, labelName) {
         try {
+            // Format label name (remove underscores)
+            const formattedLabelName = this.formatLabelName(labelName);
+            
             // 1. Get or create the label
-            const group = await this.getOrCreateContactGroup(labelName);
+            const group = await this.getOrCreateContactGroup(formattedLabelName);
             const groupResourceName = group.resourceName;
             
             // 2. Check if contact already exists
