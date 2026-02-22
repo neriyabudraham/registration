@@ -22,6 +22,7 @@ class DatabaseService {
                     last_error VARCHAR(500),
                     last_error_type VARCHAR(50),
                     error_notified BOOLEAN DEFAULT FALSE,
+                    google_contact_count INT DEFAULT NULL,
                     is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -29,6 +30,11 @@ class DatabaseService {
                     INDEX idx_active (is_active)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             `);
+            
+            // Add google_contact_count column if it doesn't exist (for existing tables)
+            await connection.execute(`
+                ALTER TABLE cs_customers ADD COLUMN IF NOT EXISTS google_contact_count INT DEFAULT NULL
+            `).catch(() => {});
 
             // Campaign stats per customer
             await connection.execute(`
@@ -58,6 +64,7 @@ class DatabaseService {
                     campaign_name VARCHAR(255) NOT NULL,
                     contact_phone VARCHAR(20) NOT NULL,
                     contact_name VARCHAR(255),
+                    saved_name VARCHAR(255),
                     status ENUM('pending', 'saved', 'existed', 'error', 'skipped') DEFAULT 'pending',
                     error_message VARCHAR(500),
                     processed_at DATETIME,
@@ -68,6 +75,11 @@ class DatabaseService {
                     INDEX idx_processed (processed_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             `);
+            
+            // Add saved_name column if it doesn't exist (for existing tables)
+            await connection.execute(`
+                ALTER TABLE cs_save_log ADD COLUMN IF NOT EXISTS saved_name VARCHAR(255) AFTER contact_name
+            `).catch(() => {});
 
             // Hourly stats for graphs
             await connection.execute(`
