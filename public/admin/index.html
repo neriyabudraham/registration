@@ -442,9 +442,48 @@
             .filters { flex-direction: column; }
             .search-box { width: 100%; }
         }
+        
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            background: var(--white);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 300px;
+            animation: slideIn 0.3s ease;
+        }
+        .toast.success { border-right: 4px solid var(--success); }
+        .toast.error { border-right: 4px solid var(--danger); }
+        .toast.info { border-right: 4px solid var(--primary); }
+        .toast-icon { font-size: 1.5rem; }
+        .toast-content { flex: 1; }
+        .toast-title { font-weight: 600; margin-bottom: 2px; }
+        .toast-message { font-size: 0.85rem; color: var(--text-light); word-break: break-all; }
+        .toast-close { cursor: pointer; opacity: 0.5; font-size: 1.2rem; }
+        .toast-close:hover { opacity: 1; }
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
     </style>
 </head>
 <body>
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+    
     <!-- Login Page -->
     <div id="loginPage" class="login-container login-page">
         <div class="login-card">
@@ -1352,6 +1391,29 @@
 
         // ==================== RECONNECTION LINKS ====================
         
+        // Show toast notification
+        function showToast(type, title, message, duration = 4000) {
+            const container = document.getElementById('toastContainer');
+            const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+            
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <span class="toast-icon">${icons[type] || '📢'}</span>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    ${message ? `<div class="toast-message">${message}</div>` : ''}
+                </div>
+                <span class="toast-close" onclick="this.parentElement.remove()">×</span>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                if (toast.parentElement) toast.remove();
+            }, duration);
+        }
+        
         // Copy reconnection link to clipboard
         async function copyReconnectLink(phone) {
             try {
@@ -1359,14 +1421,14 @@
                 const data = await res.json();
                 
                 if (!res.ok) {
-                    alert('שגיאה ביצירת קישור');
+                    showToast('error', 'שגיאה', 'לא הצלחנו ליצור את הקישור');
                     return;
                 }
                 
                 await navigator.clipboard.writeText(data.link);
-                alert('הקישור הועתק ללוח!\n\n' + data.link);
+                showToast('success', 'הקישור הועתק!', data.link);
             } catch (e) {
-                alert('שגיאה בהעתקת הקישור');
+                showToast('error', 'שגיאה', 'לא הצלחנו להעתיק את הקישור');
             }
         }
         
@@ -1380,9 +1442,13 @@
                 });
                 const data = await res.json();
                 
-                alert(res.ok ? 'הקישור נשלח בהצלחה!' : 'שגיאה בשליחה: ' + (data.error || 'לא ידוע'));
+                if (res.ok) {
+                    showToast('success', 'נשלח!', 'הקישור נשלח בהצלחה ללקוח');
+                } else {
+                    showToast('error', 'שגיאה', data.error || 'לא הצלחנו לשלוח');
+                }
             } catch (e) {
-                alert('שגיאה בשליחה');
+                showToast('error', 'שגיאה', 'לא הצלחנו לשלוח את ההודעה');
             }
         }
         

@@ -240,15 +240,21 @@ class DatabaseService {
                 const errorType = errorMessage?.split(':')[0] || 'UNKNOWN_ERROR';
                 const isTokenError = errorType === 'TOKEN_INVALID' || errorType === 'PERMISSION_DENIED';
                 
+                // Get customer info for INSERT
+                const [custRows] = await connection.execute(`
+                    SELECT FullName, Email FROM לקוחות WHERE Phone = ?
+                `, [customerPhone]);
+                const custInfo = custRows[0] || {};
+                
                 await connection.execute(`
-                    INSERT INTO cs_customers (phone, last_error, last_error_type, has_valid_tokens)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO cs_customers (phone, full_name, email, last_error, last_error_type, has_valid_tokens)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE
                         last_error = VALUES(last_error),
                         last_error_type = VALUES(last_error_type),
-                        has_valid_tokens = IF(? = 1, 0, has_valid_tokens),
+                        has_valid_tokens = VALUES(has_valid_tokens),
                         updated_at = NOW()
-                `, [customerPhone, errorMessage, errorType, isTokenError ? 0 : 1, isTokenError ? 1 : 0]);
+                `, [customerPhone, custInfo.FullName || '', custInfo.Email || '', errorMessage, errorType, isTokenError ? 0 : 1]);
             }
         } finally {
             connection.release();
@@ -265,16 +271,24 @@ class DatabaseService {
             `, [customerPhone]);
             
             const custInfo = custRows[0] || {};
+            const isTokenError = errorType === 'TOKEN_INVALID' || errorType === 'PERMISSION_DENIED';
+            
+            console.log(`Updating error for ${customerPhone}: ${errorType} - ${errorMessage}`);
             
             await connection.execute(`
-                INSERT INTO cs_customers (phone, full_name, email, last_error, last_error_type, error_notified)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO cs_customers (phone, full_name, email, last_error, last_error_type, error_notified, has_valid_tokens)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     last_error = VALUES(last_error),
                     last_error_type = VALUES(last_error_type),
                     error_notified = VALUES(error_notified),
+                    has_valid_tokens = VALUES(has_valid_tokens),
                     updated_at = NOW()
-            `, [customerPhone, custInfo.FullName || '', custInfo.Email || '', errorMessage, errorType, notified]);
+            `, [customerPhone, custInfo.FullName || '', custInfo.Email || '', errorMessage, errorType, notified, isTokenError ? 0 : 1]);
+            
+            console.log(`Error updated successfully for ${customerPhone}`);
+        } catch (err) {
+            console.error(`Failed to update error for ${customerPhone}:`, err.message);
         } finally {
             connection.release();
         }
