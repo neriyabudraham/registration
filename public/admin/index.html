@@ -543,6 +543,7 @@
                     </div>
                     <select class="filter-select" id="sortSelect" onchange="sortCustomers()">
                         <option value="relevance">מיון: רלוונטיות</option>
+                        <option value="errors">מיון: שגיאות קודם</option>
                         <option value="pending">מיון: ממתינים לשמירה</option>
                         <option value="saved">מיון: נשמרו</option>
                         <option value="campaigns">מיון: מספר קמפיינים</option>
@@ -819,6 +820,16 @@
             let sorted = [...allCustomers];
             
             switch(sort) {
+                case 'errors':
+                    sorted.sort((a, b) => {
+                        // Customers with errors first
+                        const aHasError = a.last_error ? 1 : 0;
+                        const bHasError = b.last_error ? 1 : 0;
+                        if (bHasError !== aHasError) return bHasError - aHasError;
+                        // Then by pending
+                        return Number(b.total_pending || 0) - Number(a.total_pending || 0);
+                    });
+                    break;
                 case 'pending':
                     sorted.sort((a, b) => Number(b.total_pending || 0) - Number(a.total_pending || 0));
                     break;
@@ -958,6 +969,19 @@
             
             let html = '';
             
+            // Check for TOKEN_INVALID errors in recent activity (last 24 hours)
+            const recentErrors = (recentActivity || []).filter(a => 
+                a.status === 'error' && 
+                a.error_message && 
+                a.error_message.includes('TOKEN_INVALID')
+            );
+            const hasRecentTokenError = recentErrors.length > 0;
+            
+            // Determine error state - either from customer.last_error or from recent activity
+            const hasError = customer.last_error || hasRecentTokenError;
+            const errorType = customer.last_error_type || (hasRecentTokenError ? 'TOKEN_INVALID' : null);
+            const errorMessage = customer.last_error || (hasRecentTokenError ? recentErrors[0].error_message : null);
+            
             // Customer info header
             html += `
                 <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
@@ -974,16 +998,16 @@
             `;
             
             // Error alert with details and reconnection buttons
-            if (customer.last_error) {
-                const needsReconnect = ['TOKEN_INVALID', 'PERMISSION_DENIED'].includes(customer.last_error_type);
-                const needsNewAccount = ['CONTACT_LIMIT_EXCEEDED', 'CONTACT_LIMIT_MAX'].includes(customer.last_error_type);
+            if (hasError) {
+                const needsReconnect = ['TOKEN_INVALID', 'PERMISSION_DENIED'].includes(errorType);
+                const needsNewAccount = ['CONTACT_LIMIT_EXCEEDED', 'CONTACT_LIMIT_MAX'].includes(errorType);
                 
                 html += `
                     <div class="error-alert" style="background: #fef2f2; border: 2px solid var(--danger); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
                         <div style="font-size: 1.1rem; font-weight: 600; color: var(--danger); margin-bottom: 0.5rem;">
-                            ${formatErrorType(customer.last_error_type)}
+                            ${formatErrorType(errorType)}
                         </div>
-                        <div style="color: #991b1b; margin-bottom: 1rem;">${customer.last_error}</div>
+                        <div style="color: #991b1b; margin-bottom: 1rem;">${errorMessage}</div>
                         
                         ${needsReconnect ? `
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">

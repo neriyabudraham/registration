@@ -227,15 +227,26 @@ class DatabaseService {
         }
     }
 
-    // Update customer error status
+    // Update customer error status (INSERT if not exists)
     async updateCustomerError(customerPhone, errorType, errorMessage, notified = false) {
         const connection = await this.pool.getConnection();
         try {
+            // First try to get customer info from לקוחות table
+            const [custRows] = await connection.execute(`
+                SELECT FullName, Email FROM לקוחות WHERE Phone = ?
+            `, [customerPhone]);
+            
+            const custInfo = custRows[0] || {};
+            
             await connection.execute(`
-                UPDATE cs_customers 
-                SET last_error = ?, last_error_type = ?, error_notified = ?, updated_at = NOW()
-                WHERE phone = ?
-            `, [errorMessage, errorType, notified, customerPhone]);
+                INSERT INTO cs_customers (phone, full_name, email, last_error, last_error_type, error_notified)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    last_error = VALUES(last_error),
+                    last_error_type = VALUES(last_error_type),
+                    error_notified = VALUES(error_notified),
+                    updated_at = NOW()
+            `, [customerPhone, custInfo.FullName || '', custInfo.Email || '', errorMessage, errorType, notified]);
         } finally {
             connection.release();
         }
