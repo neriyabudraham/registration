@@ -297,4 +297,54 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load config
     loadConfig();
+    
+    // Check for pre-filled parameters (reconnection link)
+    const urlParams = new URLSearchParams(window.location.search);
+    const isReconnect = urlParams.get('reconnect') === '1';
+    
+    if (isReconnect) {
+        // Pre-fill form fields
+        const phone = urlParams.get('phone') || '';
+        const email = urlParams.get('email') || '';
+        const name = urlParams.get('name') || '';
+        
+        // Split name into first and last
+        const nameParts = name.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        
+        // Set form values
+        document.getElementById('firstName').value = firstName;
+        document.getElementById('lastName').value = lastName;
+        document.getElementById('phone').value = formatPhoneDisplay(phone);
+        document.getElementById('email').value = email;
+        
+        // Update formData
+        formData.firstName = firstName;
+        formData.lastName = lastName;
+        formData.phone = phone;
+        formData.email = email;
+        
+        // Skip to form directly
+        instructionsSection.style.display = 'none';
+        formSection.style.display = 'block';
+    }
 });
+
+// Format phone for display
+function formatPhoneDisplay(phone) {
+    if (!phone) return '';
+    let digits = phone.replace(/[^0-9]/g, '');
+    
+    // Convert 972 to 0
+    if (digits.startsWith('972')) {
+        digits = '0' + digits.slice(3);
+    }
+    
+    // Format as 05X-XXXXXXX
+    if (digits.length === 10 && digits.startsWith('0')) {
+        return digits.slice(0, 3) + '-' + digits.slice(3);
+    }
+    
+    return digits;
+}

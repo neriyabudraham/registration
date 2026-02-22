@@ -198,8 +198,17 @@ class ContactSaverService {
             'RATE_LIMIT': 'מגבלת קצב זמנית',
             'RATE_LIMIT_TEMPORARY': 'מגבלת קצב זמנית - ממתין',
             'CONTACT_LIMIT_EXCEEDED': 'החשבון הגיע למגבלת אנשי קשר - יש למחוק אנשי קשר',
+            'CONTACT_LIMIT_MAX': 'חריגה ממגבלת 25,000 אנשי קשר - יש לחבר חשבון חדש או למחוק אנשי קשר',
             'UNKNOWN_ERROR': 'שגיאה לא ידועה'
         };
+        
+        // Only send WhatsApp notifications for critical errors (not temporary rate limits)
+        const criticalErrors = ['TOKEN_INVALID', 'PERMISSION_DENIED', 'CONTACT_LIMIT_EXCEEDED', 'CONTACT_LIMIT_MAX'];
+        if (!criticalErrors.includes(errorType)) {
+            // Just update database, don't send WhatsApp
+            await this.db.updateCustomerError(customerPhone, errorType, errorMessage, false);
+            return;
+        }
 
         const message = `⚠️ *שגיאה בשמירת אנשי קשר*
 
@@ -263,6 +272,17 @@ class ContactSaverService {
         const contactCount = await googleService.getContactCount();
         if (contactCount !== null) {
             await this.db.updateCustomerContactCount(customerPhone, contactCount);
+            
+            // Check if account has too many contacts (>25000)
+            if (contactCount >= 25000) {
+                await this.sendErrorNotification(
+                    customerPhone, 
+                    'CONTACT_LIMIT_MAX', 
+                    `החשבון מכיל ${contactCount} אנשי קשר - חריגה ממגבלת 25,000. יש לחבר חשבון חדש או למחוק אנשי קשר`,
+                    customer.FullName
+                );
+                return { status: 'contact_limit_max', contactCount };
+            }
         }
         
         let savedCount = 0;

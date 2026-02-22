@@ -502,5 +502,146 @@ module.exports = (pool, config, contactSaver) => {
         }
     });
 
+    // ==================== RECONNECTION LINKS ====================
+
+    // Get reconnection link for a customer
+    router.get('/customers/:phone/reconnect-link', verifyAdmin, async (req, res) => {
+        const connection = await pool.getConnection();
+        try {
+            const { phone } = req.params;
+            
+            // Get customer info
+            const [rows] = await connection.execute(
+                'SELECT Phone, Email, FullName FROM לקוחות WHERE Phone = ?',
+                [phone]
+            );
+            
+            if (rows.length === 0) {
+                return res.status(404).json({ error: 'Customer not found' });
+            }
+            
+            const customer = rows[0];
+            const baseUrl = config.baseUrl || 'https://registration.botomat.co.il';
+            
+            // Create pre-filled registration link
+            const params = new URLSearchParams({
+                phone: customer.Phone || '',
+                email: customer.Email || '',
+                name: customer.FullName || '',
+                reconnect: '1'
+            });
+            
+            const link = `${baseUrl}/register?${params.toString()}`;
+            
+            res.json({ 
+                success: true, 
+                link,
+                customer: {
+                    phone: customer.Phone,
+                    email: customer.Email,
+                    name: customer.FullName
+                }
+            });
+        } catch (error) {
+            console.error('Reconnect link error:', error);
+            res.status(500).json({ error: 'Failed to generate link' });
+        } finally {
+            connection.release();
+        }
+    });
+
+    // Send reconnection link to customer via WhatsApp
+    router.post('/customers/:phone/send-reconnect', verifyAdmin, async (req, res) => {
+        const connection = await pool.getConnection();
+        try {
+            const { phone } = req.params;
+            
+            // Get customer info
+            const [rows] = await connection.execute(
+                'SELECT Phone, Email, FullName FROM לקוחות WHERE Phone = ?',
+                [phone]
+            );
+            
+            if (rows.length === 0) {
+                return res.status(404).json({ error: 'Customer not found' });
+            }
+            
+            const customer = rows[0];
+            const baseUrl = config.baseUrl || 'https://registration.botomat.co.il';
+            
+            // Create pre-filled registration link
+            const params = new URLSearchParams({
+                phone: customer.Phone || '',
+                email: customer.Email || '',
+                name: customer.FullName || '',
+                reconnect: '1'
+            });
+            
+            const link = `${baseUrl}/register?${params.toString()}`;
+            
+            // Format phone for WhatsApp
+            let whatsappPhone = customer.Phone.replace(/[^0-9]/g, '');
+            if (!whatsappPhone.startsWith('972')) {
+                whatsappPhone = '972' + whatsappPhone.replace(/^0/, '');
+            }
+            
+            // Send WhatsApp message
+            const message = `שלום ${customer.FullName || ''},
+
+נדרשת התחברות מחדש לחשבון הגוגל שלך לצורך שמירת אנשי קשר.
+
+לחץ/י על הקישור להתחברות:
+${link}
+
+תודה!`;
+
+            await axios.post(config.whatsapp.apiUrl, {
+                chatId: `${whatsappPhone}@c.us`,
+                text: message,
+                session: config.whatsapp.session
+            }, {
+                headers: {
+                    'accept': 'application/json',
+                    'X-Api-Key': config.whatsapp.apiKey,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            res.json({ success: true, message: 'Link sent successfully' });
+        } catch (error) {
+            console.error('Send reconnect error:', error);
+            res.status(500).json({ error: 'Failed to send link' });
+        } finally {
+            connection.release();
+        }
+    });
+
+    // Get all customers with errors
+    router.get('/customers-with-errors', verifyAdmin, async (req, res) => {
+        const connection = await pool.getConnection();
+        try {
+            const [customers] = await connection.execute(`
+                SELECT 
+                    c.phone,
+                    c.full_name,
+                    c.email,
+                    c.last_error,
+                    c.last_error_type,
+                    c.google_contact_count,
+                    c.updated_at
+                FROM cs_customers c
+                WHERE c.last_error IS NOT NULL
+                ORDER BY c.updated_at DESC
+            `);
+            
+            res.json(customers);
+        } catch (error) {
+            console.error('Get customers with errors:', error);
+            res.status(500).json({ error: 'Failed to get customers' });
+        } finally {
+            connection.release();
+        }
+    });
+
     return router;
 };

@@ -504,6 +504,7 @@
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('customers')">👥 לקוחות</button>
                 <button class="tab" onclick="switchTab('campaigns')">📁 קמפיינים</button>
+                <button class="tab" onclick="switchTab('errors')">⚠️ שגיאות</button>
             </div>
             
             <!-- Stats -->
@@ -561,6 +562,13 @@
                     </div>
                 </div>
                 <div id="campaignsGrid" class="customers-grid">
+                    <div class="loading"><div class="spinner"></div><p>טוען...</p></div>
+                </div>
+            </div>
+            
+            <!-- Errors Tab -->
+            <div id="errorsTab" style="display: none;">
+                <div id="errorsGrid" class="customers-grid">
                     <div class="loading"><div class="spinner"></div><p>טוען...</p></div>
                 </div>
             </div>
@@ -691,16 +699,70 @@
             location.reload();
         }
         
+        let allErrors = [];
+        
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
             
             document.getElementById('customersTab').style.display = tab === 'customers' ? 'block' : 'none';
             document.getElementById('campaignsTab').style.display = tab === 'campaigns' ? 'block' : 'none';
+            document.getElementById('errorsTab').style.display = tab === 'errors' ? 'block' : 'none';
             
             if (tab === 'campaigns' && allCampaigns.length === 0) {
                 loadCampaigns();
             }
+            if (tab === 'errors') {
+                loadErrors();
+            }
+        }
+        
+        async function loadErrors() {
+            try {
+                const res = await fetch(`${API_BASE}/customers-with-errors`, { credentials: 'include' });
+                allErrors = await res.json();
+                renderErrors(allErrors);
+            } catch (e) { 
+                console.error('Load errors:', e);
+                document.getElementById('errorsGrid').innerHTML = '<div class="empty-state">שגיאה בטעינה</div>';
+            }
+        }
+        
+        function renderErrors(errors) {
+            const grid = document.getElementById('errorsGrid');
+            
+            if (!errors || errors.length === 0) {
+                grid.innerHTML = '<div class="empty-state">🎉 אין לקוחות עם שגיאות!</div>';
+                return;
+            }
+            
+            grid.innerHTML = errors.map(c => `
+                <div class="customer-card has-error" onclick="openCustomerDetail('${c.phone}')">
+                    <div class="customer-card-header">
+                        <div class="customer-info">
+                            <h3>${c.full_name || 'ללא שם'}</h3>
+                            <div class="phone">${c.phone || '-'}</div>
+                        </div>
+                        <div class="customer-status">
+                            ${c.google_contact_count !== null ? `<span class="badge" style="background: #e0e7ff; color: #3730a3;">📇 ${c.google_contact_count}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="error-banner">
+                        <strong>${formatErrorType(c.last_error_type)}</strong>
+                        <div style="font-size: 0.8rem; margin-top: 2px;">${c.last_error}</div>
+                    </div>
+                    <div style="padding: 0.75rem 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        ${['TOKEN_INVALID', 'PERMISSION_DENIED'].includes(c.last_error_type) ? `
+                            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); copyReconnectLink('${c.phone}')" style="font-size: 0.75rem;">📋 העתק קישור</button>
+                            <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); sendReconnectLink('${c.phone}')" style="font-size: 0.75rem;">📱 שלח ללקוח</button>
+                        ` : ''}
+                    </div>
+                    <div class="customer-card-footer">
+                        <span>${c.email || '-'}</span>
+                        <span style="font-size: 0.75rem;">${c.updated_at ? new Date(c.updated_at).toLocaleString('he-IL') : ''}</span>
+                    </div>
+                </div>
+            `).join('');
         }
         
         async function loadData() {
@@ -911,14 +973,34 @@
                 </div>
             `;
             
-            // Error alert with details
+            // Error alert with details and reconnection buttons
             if (customer.last_error) {
+                const needsReconnect = ['TOKEN_INVALID', 'PERMISSION_DENIED'].includes(customer.last_error_type);
+                const needsNewAccount = ['CONTACT_LIMIT_EXCEEDED', 'CONTACT_LIMIT_MAX'].includes(customer.last_error_type);
+                
                 html += `
                     <div class="error-alert" style="background: #fef2f2; border: 2px solid var(--danger); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
                         <div style="font-size: 1.1rem; font-weight: 600; color: var(--danger); margin-bottom: 0.5rem;">
                             ${formatErrorType(customer.last_error_type)}
                         </div>
-                        <div style="color: #991b1b;">${customer.last_error}</div>
+                        <div style="color: #991b1b; margin-bottom: 1rem;">${customer.last_error}</div>
+                        
+                        ${needsReconnect ? `
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button class="btn btn-sm btn-primary" onclick="copyReconnectLink('${customer.phone}')">
+                                📋 העתק קישור התחברות
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="sendReconnectLink('${customer.phone}')">
+                                📱 שלח קישור ללקוח
+                            </button>
+                        </div>
+                        ` : ''}
+                        
+                        ${needsNewAccount ? `
+                        <div style="padding: 0.5rem; background: #fef3c7; border-radius: 4px; color: #92400e;">
+                            ⚠️ יש לחבר חשבון גוגל חדש או למחוק אנשי קשר מהחשבון הקיים
+                        </div>
+                        ` : ''}
                     </div>
                 `;
             }
@@ -1239,6 +1321,42 @@
                 openCustomerDetail(phone);
             } catch (e) {
                 alert('שגיאה');
+            }
+        }
+
+        // ==================== RECONNECTION LINKS ====================
+        
+        // Copy reconnection link to clipboard
+        async function copyReconnectLink(phone) {
+            try {
+                const res = await fetch(`${API_BASE}/customers/${phone}/reconnect-link`, { credentials: 'include' });
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    alert('שגיאה ביצירת קישור');
+                    return;
+                }
+                
+                await navigator.clipboard.writeText(data.link);
+                alert('הקישור הועתק ללוח!\n\n' + data.link);
+            } catch (e) {
+                alert('שגיאה בהעתקת הקישור');
+            }
+        }
+        
+        // Send reconnection link via WhatsApp
+        async function sendReconnectLink(phone) {
+            if (!confirm('לשלוח קישור התחברות ללקוח בוואטסאפ?')) return;
+            try {
+                const res = await fetch(`${API_BASE}/customers/${phone}/send-reconnect`, { 
+                    method: 'POST', 
+                    credentials: 'include' 
+                });
+                const data = await res.json();
+                
+                alert(res.ok ? 'הקישור נשלח בהצלחה!' : 'שגיאה בשליחה: ' + (data.error || 'לא ידוע'));
+            } catch (e) {
+                alert('שגיאה בשליחה');
             }
         }
         
