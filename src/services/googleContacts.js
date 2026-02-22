@@ -110,7 +110,7 @@ class GoogleContactsService {
                 expiresIn: response.data.expires_in
             };
         } catch (error) {
-            console.error('Token refresh error:', error.response?.data || error.message);
+            // Don't log - too noisy for invalid tokens
             throw new Error('TOKEN_REFRESH_FAILED');
         }
     }
