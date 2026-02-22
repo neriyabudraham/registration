@@ -32,9 +32,15 @@ class DatabaseService {
             `);
             
             // Add google_contact_count column if it doesn't exist (for existing tables)
-            await connection.execute(`
-                ALTER TABLE cs_customers ADD COLUMN IF NOT EXISTS google_contact_count INT DEFAULT NULL
-            `).catch(() => {});
+            try {
+                const [cols] = await connection.execute(`
+                    SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cs_customers' AND COLUMN_NAME = 'google_contact_count'
+                `);
+                if (cols.length === 0) {
+                    await connection.execute(`ALTER TABLE cs_customers ADD COLUMN google_contact_count INT DEFAULT NULL`);
+                }
+            } catch (e) { console.log('Column google_contact_count may already exist'); }
 
             // Campaign stats per customer
             await connection.execute(`
@@ -77,9 +83,15 @@ class DatabaseService {
             `);
             
             // Add saved_name column if it doesn't exist (for existing tables)
-            await connection.execute(`
-                ALTER TABLE cs_save_log ADD COLUMN IF NOT EXISTS saved_name VARCHAR(255) AFTER contact_name
-            `).catch(() => {});
+            try {
+                const [cols] = await connection.execute(`
+                    SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cs_save_log' AND COLUMN_NAME = 'saved_name'
+                `);
+                if (cols.length === 0) {
+                    await connection.execute(`ALTER TABLE cs_save_log ADD COLUMN saved_name VARCHAR(255) AFTER contact_name`);
+                }
+            } catch (e) { console.log('Column saved_name may already exist'); }
 
             // Hourly stats for graphs
             await connection.execute(`
@@ -173,9 +185,13 @@ class DatabaseService {
         const connection = await this.pool.getConnection();
         try {
             // Ensure saved_name column exists
-            await connection.execute(`
-                ALTER TABLE cs_save_log ADD COLUMN IF NOT EXISTS saved_name VARCHAR(255) AFTER contact_name
-            `).catch(() => {}); // Ignore if already exists
+            const [cols] = await connection.execute(`
+                SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cs_save_log' AND COLUMN_NAME = 'saved_name'
+            `);
+            if (cols.length === 0) {
+                await connection.execute(`ALTER TABLE cs_save_log ADD COLUMN saved_name VARCHAR(255) AFTER contact_name`);
+            }
             
             await connection.execute(`
                 INSERT INTO cs_save_log 
@@ -244,9 +260,13 @@ class DatabaseService {
         const connection = await this.pool.getConnection();
         try {
             // First ensure the column exists
-            await connection.execute(`
-                ALTER TABLE cs_customers ADD COLUMN IF NOT EXISTS google_contact_count INT DEFAULT NULL
-            `).catch(() => {}); // Ignore if already exists
+            const [cols] = await connection.execute(`
+                SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cs_customers' AND COLUMN_NAME = 'google_contact_count'
+            `);
+            if (cols.length === 0) {
+                await connection.execute(`ALTER TABLE cs_customers ADD COLUMN google_contact_count INT DEFAULT NULL`);
+            }
             
             await connection.execute(`
                 UPDATE cs_customers 
