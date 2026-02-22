@@ -383,10 +383,8 @@ class ContactSaverService {
             }
         }
         
-        // Clear rate limit notification if we're past it
-        if (!this.rateLimitedCustomers.has(customerPhone)) {
-            this.clearErrorNotification(customerPhone, 'RATE_LIMIT');
-        }
+        // Note: We no longer clear errors here - errors are cleared only when save SUCCEEDS (in logSaveAttempt)
+        // This ensures error_notified stays true until the customer reconnects and saves successfully
         
         return { status: 'processed', saved: savedCount, existed: existedCount, errors: errorCount };
     }
