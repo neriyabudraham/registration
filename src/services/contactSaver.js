@@ -280,8 +280,9 @@ class ContactSaverService {
             
             for (const contact of contacts) {
                 try {
+                    const originalName = contact.FullName || '';
                     const result = await googleService.saveContactWithLabel(
-                        contact.FullName || 'ללא שם',
+                        originalName,
                         contact.Phone,
                         tableName
                     );
@@ -289,9 +290,10 @@ class ContactSaverService {
                     const newStatus = result.status === 'created' ? 1 : 2;
                     await this.updateContactStatus(tableName, contact.Phone, customerPhone, newStatus);
                     
-                    // Log to our database
+                    // Log to our database with both original and saved name
                     const logStatus = result.status === 'created' ? 'saved' : 'existed';
-                    await this.db.logSaveAttempt(customerPhone, tableName, contact.Phone, contact.FullName, logStatus);
+                    const savedName = result.savedName || originalName;
+                    await this.db.logSaveAttempt(customerPhone, tableName, contact.Phone, originalName, logStatus, null, savedName);
                     
                     if (result.status === 'created') {
                         savedCount++;

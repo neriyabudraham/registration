@@ -994,12 +994,16 @@
                     <h3 style="margin: 1.5rem 0 1rem;">📋 פעילות אחרונה</h3>
                     <table class="campaign-table">
                         <thead>
-                            <tr><th>שם</th><th>טלפון</th><th>קמפיין</th><th>סטטוס</th><th>זמן</th></tr>
+                            <tr><th>שם מקורי</th><th>שם שנשמר</th><th>טלפון</th><th>קמפיין</th><th>סטטוס</th><th>זמן</th></tr>
                         </thead>
                         <tbody>
                             ${recentActivity.slice(0, 15).map(a => `
                                 <tr>
-                                    <td>${a.contact_name || '-'}</td>
+                                    <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis;">${a.contact_name || '-'}</td>
+                                    <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; ${a.saved_name && a.saved_name !== a.contact_name ? 'color: var(--success); font-weight: 600;' : ''}">
+                                        ${a.saved_name || a.contact_name || '-'}
+                                        ${a.saved_name && a.saved_name !== a.contact_name ? ' ✓' : ''}
+                                    </td>
                                     <td dir="ltr">${a.contact_phone}</td>
                                     <td style="font-size: 0.85rem">${formatCampaignName(a.campaign_name)}</td>
                                     <td>

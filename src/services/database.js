@@ -157,14 +157,19 @@ class DatabaseService {
     }
 
     // Log a save attempt
-    async logSaveAttempt(customerPhone, campaignName, contactPhone, contactName, status, errorMessage = null) {
+    async logSaveAttempt(customerPhone, campaignName, contactPhone, contactName, status, errorMessage = null, savedName = null) {
         const connection = await this.pool.getConnection();
         try {
+            // Ensure saved_name column exists
+            await connection.execute(`
+                ALTER TABLE cs_save_log ADD COLUMN IF NOT EXISTS saved_name VARCHAR(255) AFTER contact_name
+            `).catch(() => {}); // Ignore if already exists
+            
             await connection.execute(`
                 INSERT INTO cs_save_log 
-                (customer_phone, campaign_name, contact_phone, contact_name, status, error_message, processed_at)
-                VALUES (?, ?, ?, ?, ?, ?, NOW())
-            `, [customerPhone, campaignName, contactPhone, contactName, status, errorMessage]);
+                (customer_phone, campaign_name, contact_phone, contact_name, saved_name, status, error_message, processed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+            `, [customerPhone, campaignName, contactPhone, contactName, savedName, status, errorMessage]);
 
             // Update hourly stats
             const hourTimestamp = new Date();
