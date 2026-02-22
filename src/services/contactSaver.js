@@ -447,18 +447,27 @@ class ContactSaverService {
 
     // Periodic job to update contact counts for all customers with valid tokens
     async updateAllContactCounts() {
-        console.log('Starting contact count update for all customers...');
+        console.log('Starting contact count update...');
         
         const connection = await this.pool.getConnection();
         try {
-            // Get all customers with valid tokens
+            // Get customers with valid tokens, excluding those with known token errors
             const [customers] = await connection.execute(`
-                SELECT Phone, FullName, AccessToken, RefreshToken 
-                FROM לקוחות 
-                WHERE AccessToken IS NOT NULL AND RefreshToken IS NOT NULL
+                SELECT l.Phone, l.FullName, l.AccessToken, l.RefreshToken 
+                FROM לקוחות l
+                LEFT JOIN cs_customers c ON c.phone = l.Phone
+                WHERE l.AccessToken IS NOT NULL AND l.RefreshToken IS NOT NULL
+                AND (c.last_error_type IS NULL OR c.last_error_type NOT IN ('TOKEN_INVALID', 'PERMISSION_DENIED'))
             `);
             
+            if (customers.length === 0) {
+                console.log('No customers with valid tokens to update');
+                return;
+            }
+            
             console.log(`Updating contact counts for ${customers.length} customers`);
+            let updated = 0;
+            let errors = 0;
             
             for (const customer of customers) {
                 try {
@@ -479,7 +488,7 @@ class ContactSaverService {
                     
                     if (contactCount !== null) {
                         await this.db.updateCustomerContactCount(customer.Phone, contactCount);
-                        console.log(`Updated contact count for ${customer.FullName || customer.Phone}: ${contactCount}`);
+                        updated++;
                         
                         // Check if over limit
                         if (contactCount >= 25000) {
@@ -493,14 +502,18 @@ class ContactSaverService {
                     }
                     
                     // Small delay to avoid rate limits
-                    await new Promise(r => setTimeout(r, 500));
+                    await new Promise(r => setTimeout(r, 300));
                     
                 } catch (err) {
-                    console.log(`Could not update count for ${customer.Phone}: ${err.message}`);
+                    errors++;
+                    // Only log if it's not a known token error
+                    if (!err.message?.includes('TOKEN') && !err.message?.includes('401')) {
+                        console.log(`Count update error for ${customer.Phone}: ${err.message}`);
+                    }
                 }
             }
             
-            console.log('Contact count update completed');
+            console.log(`Contact count update: ${updated} updated, ${errors} errors`);
             
         } finally {
             connection.release();
