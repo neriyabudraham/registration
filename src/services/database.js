@@ -221,6 +221,20 @@ class DatabaseService {
                     VALUES (?, ?, 1)
                     ON DUPLICATE KEY UPDATE error_count = error_count + 1
                 `, [customerPhone, hourTimestamp]);
+                
+                // Also update cs_customers with the error (extract error type from message)
+                const errorType = errorMessage?.split(':')[0] || 'UNKNOWN_ERROR';
+                const isTokenError = errorType === 'TOKEN_INVALID' || errorType === 'PERMISSION_DENIED';
+                
+                await connection.execute(`
+                    INSERT INTO cs_customers (phone, last_error, last_error_type, has_valid_tokens)
+                    VALUES (?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        last_error = VALUES(last_error),
+                        last_error_type = VALUES(last_error_type),
+                        has_valid_tokens = IF(? = 1, 0, has_valid_tokens),
+                        updated_at = NOW()
+                `, [customerPhone, errorMessage, errorType, isTokenError ? 0 : 1, isTokenError ? 1 : 0]);
             }
         } finally {
             connection.release();
@@ -435,7 +449,14 @@ class DatabaseService {
 
                 // Get error info and contact count from our tracking table
                 const [errorRows] = await connection.execute(`
-                    SELECT last_error, last_error_type, google_contact_count FROM cs_customers WHERE phone = ?
+                    SELECT last_error, last_error_type, google_contact_count, has_valid_tokens as cs_valid_tokens FROM cs_customers WHERE phone = ?
+                `, [phone]);
+
+                // Also check for recent errors from save log (last 24 hours)
+                const [recentErrors] = await connection.execute(`
+                    SELECT error_message, processed_at FROM cs_save_log 
+                    WHERE customer_phone = ? AND status = 'error' 
+                    ORDER BY processed_at DESC LIMIT 1
                 `, [phone]);
 
                 // Get last hour saved from our log
@@ -448,15 +469,32 @@ class DatabaseService {
 
                 const custInfo = custRows[0] || {};
                 const errorInfo = errorRows[0] || {};
+                const recentError = recentErrors[0];
+                
+                // Determine error state - prefer cs_customers error, but fallback to recent log error
+                let lastError = errorInfo.last_error;
+                let lastErrorType = errorInfo.last_error_type;
+                
+                if (!lastError && recentError?.error_message) {
+                    lastError = recentError.error_message;
+                    lastErrorType = recentError.error_message?.split(':')[0] || 'UNKNOWN_ERROR';
+                }
+                
+                // Check if it's a token error
+                const isTokenError = lastErrorType === 'TOKEN_INVALID' || lastErrorType === 'PERMISSION_DENIED';
+                
+                // has_valid_tokens: false if cs_customers says so, or if there's a recent token error
+                const hasValidTokens = errorInfo.cs_valid_tokens === 0 ? false : 
+                                       (isTokenError ? false : custInfo.has_valid_tokens === 1);
 
                 customers.push({
                     phone: phone,
                     email: custInfo.Email,
                     full_name: custInfo.FullName,
                     group_id: custInfo.GroupID,
-                    has_valid_tokens: custInfo.has_valid_tokens === 1,
-                    last_error: errorInfo.last_error,
-                    last_error_type: errorInfo.last_error_type,
+                    has_valid_tokens: hasValidTokens,
+                    last_error: lastError,
+                    last_error_type: lastErrorType,
                     google_contact_count: errorInfo.google_contact_count,
                     total_contacts: stats.total_contacts,
                     total_pending: stats.total_pending,
