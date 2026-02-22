@@ -41,6 +41,18 @@ class DatabaseService {
                     await connection.execute(`ALTER TABLE cs_customers ADD COLUMN google_contact_count INT DEFAULT NULL`);
                 }
             } catch (e) { console.log('Column google_contact_count may already exist'); }
+            
+            // Add error_notified column if it doesn't exist (for existing tables)
+            try {
+                const [cols] = await connection.execute(`
+                    SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cs_customers' AND COLUMN_NAME = 'error_notified'
+                `);
+                if (cols.length === 0) {
+                    await connection.execute(`ALTER TABLE cs_customers ADD COLUMN error_notified BOOLEAN DEFAULT FALSE`);
+                    console.log('Added error_notified column to cs_customers');
+                }
+            } catch (e) { console.log('Column error_notified may already exist'); }
 
             // Campaign stats per customer
             await connection.execute(`

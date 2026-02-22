@@ -188,16 +188,19 @@ class ContactSaverService {
         // Check if we already sent notification for this exact error type (stored in DB)
         const existingError = await this.db.getCustomerErrorState(customerPhone);
         
-        if (existingError && 
+        const alreadyNotified = existingError && 
             existingError.last_error_type === errorType && 
-            existingError.error_notified === 1) {
-            // Already notified for this error type - just update the message, don't send again
-            await this.db.updateCustomerError(customerPhone, errorType, errorMessage, true);
-            console.log(`Skipping duplicate notification for ${customerPhone} - already notified for ${errorType}`);
+            (existingError.error_notified === 1 || existingError.error_notified === true || Number(existingError.error_notified) === 1);
+        
+        console.log(`Notification check for ${customerPhone}: type=${errorType}, existing=${existingError?.last_error_type}, notified=${existingError?.error_notified}, skip=${alreadyNotified}`);
+        
+        if (alreadyNotified) {
+            // Already notified for this error type - don't send again, don't update
+            console.log(`Skipping duplicate WhatsApp for ${customerPhone} - already notified for ${errorType}`);
             return;
         }
         
-        // Update database first
+        // Update database with error and mark as notified BEFORE sending
         await this.db.updateCustomerError(customerPhone, errorType, errorMessage, true);
         
         // Get customer name if not provided
