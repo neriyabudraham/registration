@@ -616,55 +616,27 @@ ${link}
         }
     });
 
-    // Get all customers with errors (from cs_customers or recent save_log)
+    // Get all customers with active errors (errors that weren't resolved by successful saves)
     router.get('/customers-with-errors', verifyAdmin, async (req, res) => {
         const connection = await pool.getConnection();
         try {
-            // Get customers with errors from both cs_customers and recent save_log
+            // Get customers with errors - check if their last activity was an error (not a success)
             const [customers] = await connection.execute(`
-                SELECT DISTINCT
-                    COALESCE(c.phone, l.customer_phone) as phone,
-                    COALESCE(c.full_name, cust.FullName) as full_name,
-                    COALESCE(c.email, cust.Email) as email,
-                    COALESCE(c.last_error, l.error_message) as last_error,
-                    COALESCE(c.last_error_type, SUBSTRING_INDEX(l.error_message, ':', 1)) as last_error_type,
-                    c.google_contact_count,
-                    COALESCE(c.updated_at, l.processed_at) as updated_at
-                FROM (
-                    SELECT customer_phone, error_message, processed_at
-                    FROM cs_save_log 
-                    WHERE status = 'error'
-                    AND processed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                    ORDER BY processed_at DESC
-                ) l
-                LEFT JOIN cs_customers c ON c.phone = l.customer_phone
-                LEFT JOIN לקוחות cust ON cust.Phone = l.customer_phone
-                
-                UNION
-                
                 SELECT 
                     c.phone,
-                    c.full_name,
-                    c.email,
+                    COALESCE(c.full_name, cust.FullName) as full_name,
+                    COALESCE(c.email, cust.Email) as email,
                     c.last_error,
                     c.last_error_type,
                     c.google_contact_count,
                     c.updated_at
                 FROM cs_customers c
+                LEFT JOIN לקוחות cust ON cust.Phone = c.phone
                 WHERE c.last_error IS NOT NULL
-                
-                ORDER BY updated_at DESC
+                ORDER BY c.updated_at DESC
             `);
             
-            // Deduplicate by phone
-            const seen = new Set();
-            const uniqueCustomers = customers.filter(c => {
-                if (seen.has(c.phone)) return false;
-                seen.add(c.phone);
-                return true;
-            });
-            
-            res.json(uniqueCustomers);
+            res.json(customers);
         } catch (error) {
             console.error('Get customers with errors:', error);
             res.status(500).json({ error: 'Failed to get customers' });

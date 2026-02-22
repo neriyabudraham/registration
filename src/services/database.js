@@ -209,12 +209,26 @@ class DatabaseService {
                     VALUES (?, ?, 1)
                     ON DUPLICATE KEY UPDATE saved_count = saved_count + 1
                 `, [customerPhone, hourTimestamp]);
+                
+                // Clear any previous error since save succeeded
+                await connection.execute(`
+                    UPDATE cs_customers 
+                    SET last_error = NULL, last_error_type = NULL, has_valid_tokens = 1, updated_at = NOW()
+                    WHERE phone = ?
+                `, [customerPhone]);
             } else if (status === 'existed') {
                 await connection.execute(`
                     INSERT INTO cs_hourly_stats (customer_phone, hour_timestamp, existed_count)
                     VALUES (?, ?, 1)
                     ON DUPLICATE KEY UPDATE existed_count = existed_count + 1
                 `, [customerPhone, hourTimestamp]);
+                
+                // Clear any previous error since connection works
+                await connection.execute(`
+                    UPDATE cs_customers 
+                    SET last_error = NULL, last_error_type = NULL, has_valid_tokens = 1, updated_at = NOW()
+                    WHERE phone = ?
+                `, [customerPhone]);
             } else if (status === 'error') {
                 await connection.execute(`
                     INSERT INTO cs_hourly_stats (customer_phone, hour_timestamp, error_count)
@@ -452,13 +466,6 @@ class DatabaseService {
                     SELECT last_error, last_error_type, google_contact_count, has_valid_tokens as cs_valid_tokens FROM cs_customers WHERE phone = ?
                 `, [phone]);
 
-                // Also check for recent errors from save log (last 24 hours)
-                const [recentErrors] = await connection.execute(`
-                    SELECT error_message, processed_at FROM cs_save_log 
-                    WHERE customer_phone = ? AND status = 'error' 
-                    ORDER BY processed_at DESC LIMIT 1
-                `, [phone]);
-
                 // Get last hour saved from our log
                 const [hourStats] = await connection.execute(`
                     SELECT COALESCE(SUM(saved_count), 0) as last_hour_saved
@@ -469,23 +476,16 @@ class DatabaseService {
 
                 const custInfo = custRows[0] || {};
                 const errorInfo = errorRows[0] || {};
-                const recentError = recentErrors[0];
                 
-                // Determine error state - prefer cs_customers error, but fallback to recent log error
-                let lastError = errorInfo.last_error;
-                let lastErrorType = errorInfo.last_error_type;
-                
-                if (!lastError && recentError?.error_message) {
-                    lastError = recentError.error_message;
-                    lastErrorType = recentError.error_message?.split(':')[0] || 'UNKNOWN_ERROR';
-                }
+                // Use error from cs_customers (which is cleared on successful saves)
+                const lastError = errorInfo.last_error;
+                const lastErrorType = errorInfo.last_error_type;
                 
                 // Check if it's a token error
                 const isTokenError = lastErrorType === 'TOKEN_INVALID' || lastErrorType === 'PERMISSION_DENIED';
                 
-                // has_valid_tokens: false if cs_customers says so, or if there's a recent token error
-                const hasValidTokens = errorInfo.cs_valid_tokens === 0 ? false : 
-                                       (isTokenError ? false : custInfo.has_valid_tokens === 1);
+                // has_valid_tokens from cs_customers (updated on success/error)
+                const hasValidTokens = errorInfo.cs_valid_tokens === 0 ? false : custInfo.has_valid_tokens === 1;
 
                 customers.push({
                     phone: phone,
