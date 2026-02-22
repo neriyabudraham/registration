@@ -349,14 +349,10 @@ class GoogleContactsService {
         }
     }
 
-    // Format label name (replace _ with space) and add date suffix MM/YY
+    // Format label name (replace _ with space) - NO date suffix on labels
     formatLabelName(name) {
         if (!name) return name;
-        const formatted = name.replace(/_/g, ' ');
-        const now = new Date();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const year = String(now.getFullYear()).slice(-2);
-        return `${formatted} ${month}/${year}`;
+        return name.replace(/_/g, ' ');
     }
 
     // Main function: Save contact with label
