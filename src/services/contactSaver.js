@@ -147,13 +147,15 @@ class ContactSaverService {
     }
 
     // Get account with least contacts (for saving)
+    // Get account with fewest contacts that's under 25k (uses pre-fetched counts if available)
     async getBestAccountForSaving(googleServices) {
         let bestAccount = null;
         let minContacts = Infinity;
         
         for (const gs of googleServices) {
             try {
-                const count = await gs.service.getContactCount();
+                // Use pre-fetched count if available, otherwise fetch
+                const count = gs.contactCount !== undefined ? gs.contactCount : await gs.service.getContactCount();
                 if (count !== null && count < minContacts && count < 25000) {
                     minContacts = count;
                     bestAccount = gs;
@@ -163,6 +165,7 @@ class ContactSaverService {
             }
         }
         
+        console.log(`Best account for saving: ${bestAccount?.email || 'none'} (${minContacts} contacts)`);
         return bestAccount;
     }
 
@@ -368,7 +371,7 @@ class ContactSaverService {
         const googleServices = this.createGoogleServices(accounts);
         console.log(`Customer ${customerPhone} has ${accounts.length} account(s): ${accounts.map(a => a.Email).join(', ')}`);
         
-        // Get total contact count across all accounts
+        // Get contact count for each account and update per-account tracking
         let totalContactCount = 0;
         let validAccountsCount = 0;
         let allValidAccountsFull = true;
@@ -379,16 +382,33 @@ class ContactSaverService {
                 if (count !== null) {
                     validAccountsCount++;
                     totalContactCount += count;
+                    gs.contactCount = count; // Store for later use
+                    
+                    // Update per-account count
+                    await this.db.updateAccountContactCount(customerPhone, gs.email, count);
+                    
                     if (count < 25000) {
                         allValidAccountsFull = false;
+                        await this.db.clearAccountError(customerPhone, gs.email);
+                    } else {
+                        // Mark this specific account as full
+                        await this.db.updateAccountError(
+                            customerPhone,
+                            gs.email,
+                            'CONTACT_LIMIT_MAX',
+                            `החשבון ${gs.email} מכיל ${count} אנשי קשר - מלא`
+                        );
                     }
                 }
             } catch (err) {
-                // Account might have invalid token - skip it
+                // Account might have invalid token - mark it
+                if (err.message?.includes('TOKEN') || err.message?.includes('401')) {
+                    await this.db.updateAccountError(customerPhone, gs.email, 'TOKEN_INVALID', 'טוקן לא תקין');
+                }
             }
         }
         
-        // Only update count if we got at least one valid response
+        // Also update the total count for backward compatibility
         if (validAccountsCount > 0) {
             await this.db.updateCustomerContactCount(customerPhone, totalContactCount);
         }
@@ -588,35 +608,35 @@ class ContactSaverService {
         }
     }
 
-    // Periodic job to update contact counts for all customers with valid tokens
+    // Periodic job to update contact counts for all accounts (per email, not per phone)
     async updateAllContactCounts() {
-        console.log('Starting contact count update...');
+        console.log('Starting contact count update (per account)...');
         
         const connection = await this.pool.getConnection();
         try {
-            // Get customers with valid tokens, excluding those with known token errors
-            const [customers] = await connection.execute(`
-                SELECT l.Phone, l.FullName, l.AccessToken, l.RefreshToken 
+            // Get all accounts with valid tokens, excluding those with known token errors
+            const [accounts] = await connection.execute(`
+                SELECT l.Phone, l.Email, l.FullName, l.AccessToken, l.RefreshToken 
                 FROM לקוחות l
-                LEFT JOIN cs_customers c ON c.phone = l.Phone
+                LEFT JOIN cs_accounts a ON a.phone = l.Phone AND a.email = l.Email
                 WHERE l.AccessToken IS NOT NULL AND l.RefreshToken IS NOT NULL
-                AND (c.last_error_type IS NULL OR c.last_error_type NOT IN ('TOKEN_INVALID', 'PERMISSION_DENIED'))
+                AND (a.last_error_type IS NULL OR a.last_error_type NOT IN ('TOKEN_INVALID', 'PERMISSION_DENIED'))
             `);
             
-            if (customers.length === 0) {
-                console.log('No customers with valid tokens to update');
+            if (accounts.length === 0) {
+                console.log('No accounts with valid tokens to update');
                 return;
             }
             
-            console.log(`Updating contact counts for ${customers.length} customers`);
+            console.log(`Updating contact counts for ${accounts.length} accounts`);
             let updated = 0;
             let errors = 0;
             
-            for (const customer of customers) {
+            for (const account of accounts) {
                 try {
                     // Decrypt tokens
-                    const accessToken = this.encryption.decrypt(customer.AccessToken) || customer.AccessToken;
-                    const refreshToken = this.encryption.decrypt(customer.RefreshToken) || customer.RefreshToken;
+                    const accessToken = this.encryption.decrypt(account.AccessToken) || account.AccessToken;
+                    const refreshToken = this.encryption.decrypt(account.RefreshToken) || account.RefreshToken;
                     
                     // Create Google service
                     const googleService = new GoogleContactsService(
@@ -630,17 +650,21 @@ class ContactSaverService {
                     const contactCount = await googleService.getContactCount();
                     
                     if (contactCount !== null) {
-                        await this.db.updateCustomerContactCount(customer.Phone, contactCount);
+                        // Update per-account count
+                        await this.db.updateAccountContactCount(account.Phone, account.Email, contactCount);
                         updated++;
                         
-                        // Check if over limit
+                        // Check if over limit for this account
                         if (contactCount >= 25000) {
-                            await this.sendErrorNotification(
-                                customer.Phone,
+                            await this.db.updateAccountError(
+                                account.Phone,
+                                account.Email,
                                 'CONTACT_LIMIT_MAX',
-                                `החשבון מכיל ${contactCount} אנשי קשר - חריגה ממגבלת 25,000`,
-                                customer.FullName
+                                `החשבון ${account.Email} מכיל ${contactCount} אנשי קשר - חריגה ממגבלת 25,000`
                             );
+                        } else {
+                            // Clear error if previously had limit error
+                            await this.db.clearAccountError(account.Phone, account.Email);
                         }
                     }
                     
@@ -651,12 +675,12 @@ class ContactSaverService {
                     errors++;
                     // Only log if it's not a known token error
                     if (!err.message?.includes('TOKEN') && !err.message?.includes('401')) {
-                        console.log(`Count update error for ${customer.Phone}: ${err.message}`);
+                        console.log(`Count update error for ${account.Email}: ${err.message}`);
                     }
                 }
             }
             
-            console.log(`Contact count update: ${updated} updated, ${errors} errors`);
+            console.log(`Contact count update: ${updated} accounts updated, ${errors} errors`);
             
         } finally {
             connection.release();

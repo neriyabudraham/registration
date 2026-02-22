@@ -1038,18 +1038,27 @@
                 </div>
             `;
             
-            // Show all linked accounts
+            // Show all linked accounts with per-account contact counts
             if (customer.accounts && customer.accounts.length > 0) {
+                const totalAccountContacts = customer.accounts.reduce((sum, acc) => sum + (acc.google_contact_count || 0), 0);
                 html += `
                     <div style="background: #f3f4f6; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem;">📧 חשבונות מקושרים (${customer.accounts.length}):</div>
+                        <div style="font-weight: 600; margin-bottom: 0.75rem;">📧 חשבונות מקושרים (${customer.accounts.length}) - סה"כ ${totalAccountContacts.toLocaleString()} אנשי קשר:</div>
                         <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                            ${customer.accounts.map(acc => `
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="width: 20px;">${acc.has_tokens ? '✅' : '❌'}</span>
-                                    <span style="flex: 1;">${acc.email}</span>
+                            ${customer.accounts.map(acc => {
+                                const isFull = acc.google_contact_count >= 25000;
+                                const hasError = acc.last_error;
+                                return `
+                                <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: ${isFull ? '#fef2f2' : hasError ? '#fef3c7' : '#fff'}; border-radius: 4px;">
+                                    <span style="width: 24px;">${acc.has_tokens ? '✅' : '❌'}</span>
+                                    <span style="flex: 1; font-size: 0.9rem;">${acc.email}</span>
+                                    <span style="font-weight: 600; color: ${isFull ? 'var(--danger)' : 'var(--primary)'};">
+                                        ${(acc.google_contact_count || 0).toLocaleString()} 📇
+                                        ${isFull ? '⚠️ מלא' : ''}
+                                    </span>
                                 </div>
-                            `).join('')}
+                                ${hasError ? `<div style="font-size: 0.75rem; color: var(--danger); margin-right: 2rem;">⚠️ ${formatErrorType(acc.last_error_type)}</div>` : ''}
+                            `}).join('')}
                         </div>
                     </div>
                 `;

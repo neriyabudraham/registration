@@ -54,6 +54,24 @@ class DatabaseService {
                 }
             } catch (e) { console.log('Column error_notified may already exist'); }
 
+            // Account tracking table (per email, for multi-account support)
+            await connection.execute(`
+                CREATE TABLE IF NOT EXISTS cs_accounts (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    phone VARCHAR(20) NOT NULL,
+                    email VARCHAR(255) NOT NULL,
+                    google_contact_count INT DEFAULT NULL,
+                    last_error VARCHAR(500),
+                    last_error_type VARCHAR(50),
+                    error_notified BOOLEAN DEFAULT FALSE,
+                    has_valid_tokens BOOLEAN DEFAULT TRUE,
+                    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_phone_email (phone, email),
+                    INDEX idx_phone (phone),
+                    INDEX idx_email (email)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            `);
+
             // Campaign stats per customer
             await connection.execute(`
                 CREATE TABLE IF NOT EXISTS cs_campaign_stats (
@@ -342,6 +360,80 @@ class DatabaseService {
         }
     }
 
+    // Update contact count for specific account (phone + email)
+    async updateAccountContactCount(phone, email, contactCount) {
+        const connection = await this.pool.getConnection();
+        try {
+            await connection.execute(`
+                INSERT INTO cs_accounts (phone, email, google_contact_count, last_updated)
+                VALUES (?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE
+                    google_contact_count = VALUES(google_contact_count),
+                    last_updated = NOW()
+            `, [phone, email, contactCount]);
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Get all accounts for a customer with their contact counts
+    async getCustomerAccounts(phone) {
+        const connection = await this.pool.getConnection();
+        try {
+            const [rows] = await connection.execute(`
+                SELECT 
+                    l.Email as email,
+                    CASE WHEN l.AccessToken IS NOT NULL AND l.RefreshToken IS NOT NULL THEN 1 ELSE 0 END as has_tokens,
+                    COALESCE(a.google_contact_count, 0) as google_contact_count,
+                    a.last_error,
+                    a.last_error_type,
+                    a.error_notified
+                FROM לקוחות l
+                LEFT JOIN cs_accounts a ON a.phone = l.Phone AND a.email = l.Email
+                WHERE l.Phone = ?
+            `, [phone]);
+            return rows;
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Update account error status
+    async updateAccountError(phone, email, errorType, errorMessage, notified = false) {
+        const connection = await this.pool.getConnection();
+        try {
+            const notifiedInt = notified ? 1 : 0;
+            const hasValidTokens = ['TOKEN_INVALID', 'PERMISSION_DENIED'].includes(errorType) ? 0 : 1;
+            
+            await connection.execute(`
+                INSERT INTO cs_accounts (phone, email, last_error, last_error_type, error_notified, has_valid_tokens, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE
+                    last_error = VALUES(last_error),
+                    last_error_type = VALUES(last_error_type),
+                    error_notified = VALUES(error_notified),
+                    has_valid_tokens = VALUES(has_valid_tokens),
+                    last_updated = NOW()
+            `, [phone, email, errorMessage, errorType, notifiedInt, hasValidTokens]);
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Clear account error
+    async clearAccountError(phone, email) {
+        const connection = await this.pool.getConnection();
+        try {
+            await connection.execute(`
+                UPDATE cs_accounts 
+                SET last_error = NULL, last_error_type = NULL, error_notified = 0, has_valid_tokens = 1, last_updated = NOW()
+                WHERE phone = ? AND email = ?
+            `, [phone, email]);
+        } finally {
+            connection.release();
+        }
+    }
+
     // Get all campaign tables (with fresh schema)
     async getCampaignTables() {
         const connection = await this.pool.getConnection();
@@ -476,17 +568,22 @@ class DatabaseService {
             const customers = [];
 
             for (const phone of allCustomerPhones) {
-                // Get ALL customer accounts from לקוחות table (multiple emails per phone)
+                // Get ALL customer accounts from לקוחות table with per-account stats
                 const [custRows] = await connection.execute(`
-                    SELECT Phone, Email, FullName, GroupID, 
-                           CASE WHEN AccessToken IS NOT NULL AND RefreshToken IS NOT NULL THEN 1 ELSE 0 END as has_valid_tokens
-                    FROM לקוחות WHERE Phone = ?
+                    SELECT l.Phone, l.Email, l.FullName, l.GroupID, 
+                           CASE WHEN l.AccessToken IS NOT NULL AND l.RefreshToken IS NOT NULL THEN 1 ELSE 0 END as has_valid_tokens,
+                           a.google_contact_count as account_contact_count,
+                           a.last_error as account_error,
+                           a.last_error_type as account_error_type
+                    FROM לקוחות l
+                    LEFT JOIN cs_accounts a ON a.phone = l.Phone AND a.email = l.Email
+                    WHERE l.Phone = ?
                 `, [phone]);
 
                 // Get real-time stats
                 const stats = await this.getRealTimeCustomerStats(phone);
 
-                // Get error info and contact count from our tracking table
+                // Get error info from our tracking table (legacy, for backward compat)
                 const [errorRows] = await connection.execute(`
                     SELECT last_error, last_error_type, google_contact_count, has_valid_tokens as cs_valid_tokens FROM cs_customers WHERE phone = ?
                 `, [phone]);
@@ -510,11 +607,17 @@ class DatabaseService {
                 const errorInfo = errorRows[0] || {};
                 const lastActivity = recentActivity[0];
                 
-                // Collect all accounts (emails) for this phone
+                // Collect all accounts (emails) for this phone with per-account data
                 const accounts = custRows.map(row => ({
                     email: row.Email,
-                    has_tokens: row.has_valid_tokens === 1
+                    has_tokens: row.has_valid_tokens === 1,
+                    google_contact_count: row.account_contact_count || 0,
+                    last_error: row.account_error,
+                    last_error_type: row.account_error_type
                 }));
+                
+                // Calculate total contacts across all accounts
+                const totalContactCount = accounts.reduce((sum, acc) => sum + (acc.google_contact_count || 0), 0);
                 
                 // Determine error state:
                 // 1. If cs_customers has error, use it
@@ -535,17 +638,24 @@ class DatabaseService {
                 const hasValidTokens = errorInfo.cs_valid_tokens === 0 ? false : 
                                        (isTokenError ? false : anyAccountHasTokens);
 
+                // Check for any account-level errors
+                const accountWithError = accounts.find(a => a.last_error);
+                if (accountWithError && !lastError) {
+                    lastError = accountWithError.last_error;
+                    lastErrorType = accountWithError.last_error_type;
+                }
+
                 customers.push({
                     phone: phone,
                     email: custInfo.Email,
                     full_name: custInfo.FullName,
                     group_id: custInfo.GroupID,
-                    accounts: accounts, // Array of all linked accounts
+                    accounts: accounts, // Array of all linked accounts with per-account contact counts
                     accounts_count: accounts.length,
                     has_valid_tokens: hasValidTokens,
                     last_error: lastError,
                     last_error_type: lastErrorType,
-                    google_contact_count: errorInfo.google_contact_count,
+                    google_contact_count: totalContactCount, // Sum of all accounts
                     total_contacts: stats.total_contacts,
                     total_pending: stats.total_pending,
                     total_saved: stats.total_saved,
@@ -725,22 +835,40 @@ class DatabaseService {
                 FROM לקוחות WHERE Phone = ?
             `, [customerPhone]);
 
-            // Get error info and contact count from our tracking table
-            const [errorRows] = await connection.execute(`
-                SELECT last_error, last_error_type, error_notified, google_contact_count FROM cs_customers WHERE phone = ?
+            // Get per-account stats from cs_accounts
+            const [accountStats] = await connection.execute(`
+                SELECT email, google_contact_count, last_error, last_error_type, has_valid_tokens as account_valid
+                FROM cs_accounts WHERE phone = ?
             `, [customerPhone]);
+            
+            // Create a map of account stats by email
+            const accountStatsMap = {};
+            for (const as of accountStats) {
+                accountStatsMap[as.email] = as;
+            }
 
             const custInfo = custRows[0] || {};
-            const errorInfo = errorRows[0] || {};
             
-            // Collect all accounts
-            const accounts = custRows.map(row => ({
-                email: row.Email,
-                has_tokens: row.has_valid_tokens === 1
-            }));
+            // Collect all accounts with per-account data
+            const accounts = custRows.map(row => {
+                const stats = accountStatsMap[row.Email] || {};
+                return {
+                    email: row.Email,
+                    has_tokens: row.has_valid_tokens === 1,
+                    google_contact_count: stats.google_contact_count || 0,
+                    last_error: stats.last_error,
+                    last_error_type: stats.last_error_type
+                };
+            });
+            
+            // Calculate total contact count across all accounts
+            const totalContactCount = accounts.reduce((sum, acc) => sum + (acc.google_contact_count || 0), 0);
             
             // Any account has valid tokens
             const anyAccountHasTokens = accounts.some(a => a.has_tokens);
+            
+            // Find first error from any account
+            const accountWithError = accounts.find(a => a.last_error);
 
             const customer = {
                 phone: customerPhone,
@@ -750,9 +878,9 @@ class DatabaseService {
                 accounts: accounts,
                 accounts_count: accounts.length,
                 has_valid_tokens: anyAccountHasTokens,
-                last_error: errorInfo.last_error,
-                last_error_type: errorInfo.last_error_type,
-                google_contact_count: errorInfo.google_contact_count
+                last_error: accountWithError?.last_error || null,
+                last_error_type: accountWithError?.last_error_type || null,
+                google_contact_count: totalContactCount
             };
 
             // Get REAL-TIME campaign stats
