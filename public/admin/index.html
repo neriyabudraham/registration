@@ -793,6 +793,12 @@
                             <div class="label">קיימים</div>
                             <div class="value" style="color: var(--text-light)">${Number(c.total_existed || 0).toLocaleString()}</div>
                         </div>
+                        ${c.total_skipped > 0 ? `
+                        <div class="mini-stat">
+                            <div class="label">לא לשמירה</div>
+                            <div class="value" style="color: var(--danger)">${Number(c.total_skipped).toLocaleString()}</div>
+                        </div>
+                        ` : ''}
                     </div>
                     <div class="customer-card-footer">
                         <span>${c.email || '-'}</span>
@@ -830,6 +836,12 @@
                             <div class="label">קיימים</div>
                             <div class="value">${Number(c.total_existed || 0).toLocaleString()}</div>
                         </div>
+                        ${c.total_skipped > 0 ? `
+                        <div class="stat">
+                            <div class="label">לא לשמירה</div>
+                            <div class="value" style="color: var(--danger)">${Number(c.total_skipped).toLocaleString()}</div>
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
             `).join('');
@@ -882,6 +894,12 @@
                         <div class="label">קיימים</div>
                         <div class="value">${Number(summary.total_existed).toLocaleString()}</div>
                     </div>
+                    ${summary.total_skipped > 0 ? `
+                    <div class="detail-stat">
+                        <div class="label">לא לשמירה</div>
+                        <div class="value" style="color: var(--danger)">${Number(summary.total_skipped).toLocaleString()}</div>
+                    </div>
+                    ` : ''}
                     <div class="detail-stat">
                         <div class="label">בשעה</div>
                         <div class="value" style="color: var(--success)">${summary.last_hour_saved}</div>
@@ -903,6 +921,7 @@
                                 <th>ממתינים</th>
                                 <th>נשמרו</th>
                                 <th>קיימים</th>
+                                <th>לא לשמירה</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -913,6 +932,7 @@
                                     <td style="color: var(--warning)">${c.pending_count}</td>
                                     <td style="color: var(--success)">${c.saved_count}</td>
                                     <td>${c.existed_count}</td>
+                                    <td style="color: var(--danger)">${c.skipped_count || 0}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -989,6 +1009,12 @@
                         <div class="label">קיימים</div>
                         <div class="value">${Number(summary.total_existed).toLocaleString()}</div>
                     </div>
+                    ${summary.total_skipped > 0 ? `
+                    <div class="detail-stat">
+                        <div class="label">לא לשמירה</div>
+                        <div class="value" style="color: var(--danger)">${Number(summary.total_skipped).toLocaleString()}</div>
+                    </div>
+                    ` : ''}
                 </div>
             `;
             
@@ -1004,6 +1030,7 @@
                                 <th>ממתינים</th>
                                 <th>נשמרו</th>
                                 <th>קיימים</th>
+                                <th>לא לשמירה</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1018,6 +1045,7 @@
                                     <td style="color: var(--warning)">${c.pending_count}</td>
                                     <td style="color: var(--success)">${c.saved_count}</td>
                                     <td>${c.existed_count}</td>
+                                    <td style="color: var(--danger)">${c.skipped_count || 0}</td>
                                 </tr>
                             `).join('')}
                         </tbody>

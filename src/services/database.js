@@ -222,26 +222,33 @@ class DatabaseService {
         }
     }
 
-    // Get all campaign tables
+    // Get all campaign tables (with fresh schema)
     async getCampaignTables() {
         const connection = await this.pool.getConnection();
         try {
+            // Force refresh schema cache
+            await connection.execute('SET SESSION information_schema_stats_expiry = 0');
+            
             const [tables] = await connection.execute(`
                 SELECT TABLE_NAME 
                 FROM information_schema.TABLES 
                 WHERE TABLE_SCHEMA = DATABASE()
                 AND (TABLE_NAME LIKE 'הגרלה%' OR TABLE_NAME LIKE 'הגרלת%' OR TABLE_NAME LIKE 'שמירת\\_אנשי\\_קשר%')
             `);
+            console.log(`Found ${tables.length} campaign tables`);
             return tables.map(t => t.TABLE_NAME);
         } finally {
             connection.release();
         }
     }
 
-    // Get phone columns from a table (customer phone numbers)
+    // Get phone columns from a table (customer phone numbers) - fresh query
     async getPhoneColumns(tableName) {
         const connection = await this.pool.getConnection();
         try {
+            // Force refresh schema cache
+            await connection.execute('SET SESSION information_schema_stats_expiry = 0');
+            
             const [columns] = await connection.execute(`
                 SELECT COLUMN_NAME 
                 FROM information_schema.COLUMNS 
@@ -259,14 +266,24 @@ class DatabaseService {
     async getRealTimeCustomerStats(customerPhone) {
         const connection = await this.pool.getConnection();
         try {
+            // Force refresh schema cache
+            await connection.execute('SET SESSION information_schema_stats_expiry = 0');
+            
             const tables = await this.getCampaignTables();
             const campaigns = [];
-            let totalPending = 0, totalSaved = 0, totalExisted = 0, totalContacts = 0;
+            let totalPending = 0, totalSaved = 0, totalExisted = 0, totalContacts = 0, totalSkipped = 0;
 
             for (const table of tables) {
-                // Check if this customer has a column in this table
-                const phoneColumns = await this.getPhoneColumns(table);
-                if (!phoneColumns.includes(customerPhone)) continue;
+                // Check if this customer has a column in this table (fresh query each time)
+                const [columns] = await connection.execute(`
+                    SELECT COLUMN_NAME 
+                    FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = ? 
+                    AND COLUMN_NAME = ?
+                `, [table, customerPhone]);
+                
+                if (columns.length === 0) continue;
 
                 try {
                     const [stats] = await connection.execute(`
@@ -274,7 +291,8 @@ class DatabaseService {
                             COUNT(*) as total,
                             CAST(SUM(CASE WHEN \`${customerPhone}\` = 0 THEN 1 ELSE 0 END) AS SIGNED) as pending,
                             CAST(SUM(CASE WHEN \`${customerPhone}\` = 1 THEN 1 ELSE 0 END) AS SIGNED) as saved,
-                            CAST(SUM(CASE WHEN \`${customerPhone}\` = 2 THEN 1 ELSE 0 END) AS SIGNED) as existed
+                            CAST(SUM(CASE WHEN \`${customerPhone}\` = 2 THEN 1 ELSE 0 END) AS SIGNED) as existed,
+                            CAST(SUM(CASE WHEN \`${customerPhone}\` IN (3, 4) THEN 1 ELSE 0 END) AS SIGNED) as skipped
                         FROM \`${table}\`
                     `);
 
@@ -282,6 +300,7 @@ class DatabaseService {
                     const pending = Number(s.pending) || 0;
                     const saved = Number(s.saved) || 0;
                     const existed = Number(s.existed) || 0;
+                    const skipped = Number(s.skipped) || 0;
                     const total = Number(s.total) || 0;
 
                     campaigns.push({
@@ -289,15 +308,17 @@ class DatabaseService {
                         total_contacts: total,
                         pending_count: pending,
                         saved_count: saved,
-                        existed_count: existed
+                        existed_count: existed,
+                        skipped_count: skipped
                     });
 
                     totalPending += pending;
                     totalSaved += saved;
                     totalExisted += existed;
+                    totalSkipped += skipped;
                     totalContacts += total;
                 } catch (e) {
-                    // Column might not exist properly
+                    console.error(`Error getting stats for ${table}/${customerPhone}:`, e.message);
                 }
             }
 
@@ -307,6 +328,7 @@ class DatabaseService {
                 total_pending: totalPending,
                 total_saved: totalSaved,
                 total_existed: totalExisted,
+                total_skipped: totalSkipped,
                 campaign_count: campaigns.length
             };
         } finally {
@@ -372,6 +394,7 @@ class DatabaseService {
                     total_pending: stats.total_pending,
                     total_saved: stats.total_saved,
                     total_existed: stats.total_existed,
+                    total_skipped: stats.total_skipped || 0,
                     campaign_count: stats.campaign_count,
                     last_hour_saved: Number(hourStats[0]?.last_hour_saved) || 0
                 });
@@ -394,6 +417,9 @@ class DatabaseService {
     async getCampaignsWithStats() {
         const connection = await this.pool.getConnection();
         try {
+            // Force refresh schema cache
+            await connection.execute('SET SESSION information_schema_stats_expiry = 0');
+            
             const tables = await this.getCampaignTables();
             const campaigns = [];
 
@@ -401,7 +427,7 @@ class DatabaseService {
                 const phoneColumns = await this.getPhoneColumns(table);
                 if (phoneColumns.length === 0) continue;
 
-                let totalPending = 0, totalSaved = 0, totalExisted = 0, totalContacts = 0;
+                let totalPending = 0, totalSaved = 0, totalExisted = 0, totalSkipped = 0, totalContacts = 0;
 
                 // Get stats for all customers in this campaign
                 for (const phone of phoneColumns) {
@@ -411,13 +437,15 @@ class DatabaseService {
                                 COUNT(*) as total,
                                 CAST(SUM(CASE WHEN \`${phone}\` = 0 THEN 1 ELSE 0 END) AS SIGNED) as pending,
                                 CAST(SUM(CASE WHEN \`${phone}\` = 1 THEN 1 ELSE 0 END) AS SIGNED) as saved,
-                                CAST(SUM(CASE WHEN \`${phone}\` = 2 THEN 1 ELSE 0 END) AS SIGNED) as existed
+                                CAST(SUM(CASE WHEN \`${phone}\` = 2 THEN 1 ELSE 0 END) AS SIGNED) as existed,
+                                CAST(SUM(CASE WHEN \`${phone}\` IN (3, 4) THEN 1 ELSE 0 END) AS SIGNED) as skipped
                             FROM \`${table}\`
                         `);
 
                         totalPending += Number(stats[0].pending) || 0;
                         totalSaved += Number(stats[0].saved) || 0;
                         totalExisted += Number(stats[0].existed) || 0;
+                        totalSkipped += Number(stats[0].skipped) || 0;
                         totalContacts = Number(stats[0].total) || 0; // Same for all columns
                     } catch (e) {}
                 }
@@ -428,7 +456,8 @@ class DatabaseService {
                     total_contacts: totalContacts,
                     total_pending: totalPending,
                     total_saved: totalSaved,
-                    total_existed: totalExisted
+                    total_existed: totalExisted,
+                    total_skipped: totalSkipped
                 });
             }
 
@@ -445,11 +474,14 @@ class DatabaseService {
     async getCampaignDetails(campaignName) {
         const connection = await this.pool.getConnection();
         try {
+            // Force refresh schema cache
+            await connection.execute('SET SESSION information_schema_stats_expiry = 0');
+            
             const phoneColumns = await this.getPhoneColumns(campaignName);
             if (phoneColumns.length === 0) return null;
 
             const customers = [];
-            let summaryPending = 0, summarySaved = 0, summaryExisted = 0, summaryTotal = 0;
+            let summaryPending = 0, summarySaved = 0, summaryExisted = 0, summarySkipped = 0, summaryTotal = 0;
 
             for (const phone of phoneColumns) {
                 // Get customer info
@@ -471,7 +503,8 @@ class DatabaseService {
                             COUNT(*) as total,
                             CAST(SUM(CASE WHEN \`${phone}\` = 0 THEN 1 ELSE 0 END) AS SIGNED) as pending,
                             CAST(SUM(CASE WHEN \`${phone}\` = 1 THEN 1 ELSE 0 END) AS SIGNED) as saved,
-                            CAST(SUM(CASE WHEN \`${phone}\` = 2 THEN 1 ELSE 0 END) AS SIGNED) as existed
+                            CAST(SUM(CASE WHEN \`${phone}\` = 2 THEN 1 ELSE 0 END) AS SIGNED) as existed,
+                            CAST(SUM(CASE WHEN \`${phone}\` IN (3, 4) THEN 1 ELSE 0 END) AS SIGNED) as skipped
                         FROM \`${campaignName}\`
                     `);
 
@@ -479,6 +512,7 @@ class DatabaseService {
                     const pending = Number(s.pending) || 0;
                     const saved = Number(s.saved) || 0;
                     const existed = Number(s.existed) || 0;
+                    const skipped = Number(s.skipped) || 0;
                     const total = Number(s.total) || 0;
 
                     const custInfo = custRows[0] || {};
@@ -494,12 +528,14 @@ class DatabaseService {
                         total_contacts: total,
                         pending_count: pending,
                         saved_count: saved,
-                        existed_count: existed
+                        existed_count: existed,
+                        skipped_count: skipped
                     });
 
                     summaryPending += pending;
                     summarySaved += saved;
                     summaryExisted += existed;
+                    summarySkipped += skipped;
                     summaryTotal = total; // Same for all
                 } catch (e) {}
             }
@@ -512,7 +548,8 @@ class DatabaseService {
                 total_contacts: summaryTotal,
                 total_pending: summaryPending,
                 total_saved: summarySaved,
-                total_existed: summaryExisted
+                total_existed: summaryExisted,
+                total_skipped: summarySkipped
             };
             
             return { campaign_name: campaignName, customers, summary };
@@ -585,6 +622,7 @@ class DatabaseService {
                 total_pending: stats.total_pending,
                 total_saved: stats.total_saved,
                 total_existed: stats.total_existed,
+                total_skipped: stats.total_skipped || 0,
                 last_hour_saved: lastHourSaved,
                 has_error: !!customer.last_error
             };
@@ -608,13 +646,14 @@ class DatabaseService {
             // Get all customers with real-time stats
             const customers = await this.getCustomersWithStats();
 
-            let totalPending = 0, totalSaved = 0, totalExisted = 0;
+            let totalPending = 0, totalSaved = 0, totalExisted = 0, totalSkipped = 0;
             let connectedCustomers = 0, customersWithErrors = 0;
 
             for (const c of customers) {
                 totalPending += c.total_pending || 0;
                 totalSaved += c.total_saved || 0;
                 totalExisted += c.total_existed || 0;
+                totalSkipped += c.total_skipped || 0;
                 if (c.has_valid_tokens) connectedCustomers++;
                 if (c.last_error) customersWithErrors++;
             }
@@ -635,6 +674,7 @@ class DatabaseService {
                 total_pending: totalPending,
                 total_saved: totalSaved,
                 total_existed: totalExisted,
+                total_skipped: totalSkipped,
                 last_hour_saved: Number(hourActivity[0]?.last_hour_saved) || 0,
                 last_hour_errors: Number(hourActivity[0]?.last_hour_errors) || 0
             };
