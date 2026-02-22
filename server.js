@@ -282,8 +282,19 @@ app.listen(PORT, () => {
         contactSaver.run().catch(err => console.error('Contact saver error:', err));
     }, 60 * 1000);
     
+    // Start contact count update scheduler - runs every 5 minutes
+    console.log('Starting contact count update scheduler (every 5 minutes)...');
+    setInterval(() => {
+        contactSaver.updateAllContactCounts().catch(err => console.error('Contact count update error:', err));
+    }, 5 * 60 * 1000);
+    
     // Run immediately on startup (after 10 seconds to let everything initialize)
     setTimeout(() => {
         contactSaver.run().catch(err => console.error('Initial contact saver error:', err));
     }, 10000);
+    
+    // Run contact count update after 30 seconds on startup
+    setTimeout(() => {
+        contactSaver.updateAllContactCounts().catch(err => console.error('Initial contact count update error:', err));
+    }, 30000);
 });

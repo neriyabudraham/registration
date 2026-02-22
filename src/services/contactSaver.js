@@ -445,6 +445,68 @@ class ContactSaverService {
         }
     }
 
+    // Periodic job to update contact counts for all customers with valid tokens
+    async updateAllContactCounts() {
+        console.log('Starting contact count update for all customers...');
+        
+        const connection = await this.pool.getConnection();
+        try {
+            // Get all customers with valid tokens
+            const [customers] = await connection.execute(`
+                SELECT Phone, FullName, AccessToken, RefreshToken 
+                FROM לקוחות 
+                WHERE AccessToken IS NOT NULL AND RefreshToken IS NOT NULL
+            `);
+            
+            console.log(`Updating contact counts for ${customers.length} customers`);
+            
+            for (const customer of customers) {
+                try {
+                    // Decrypt tokens
+                    const accessToken = this.encryption.decrypt(customer.AccessToken) || customer.AccessToken;
+                    const refreshToken = this.encryption.decrypt(customer.RefreshToken) || customer.RefreshToken;
+                    
+                    // Create Google service
+                    const googleService = new GoogleContactsService(
+                        accessToken,
+                        refreshToken,
+                        this.config.google.clientId,
+                        this.config.google.clientSecret
+                    );
+                    
+                    // Get contact count
+                    const contactCount = await googleService.getContactCount();
+                    
+                    if (contactCount !== null) {
+                        await this.db.updateCustomerContactCount(customer.Phone, contactCount);
+                        console.log(`Updated contact count for ${customer.FullName || customer.Phone}: ${contactCount}`);
+                        
+                        // Check if over limit
+                        if (contactCount >= 25000) {
+                            await this.sendErrorNotification(
+                                customer.Phone,
+                                'CONTACT_LIMIT_MAX',
+                                `החשבון מכיל ${contactCount} אנשי קשר - חריגה ממגבלת 25,000`,
+                                customer.FullName
+                            );
+                        }
+                    }
+                    
+                    // Small delay to avoid rate limits
+                    await new Promise(r => setTimeout(r, 500));
+                    
+                } catch (err) {
+                    console.log(`Could not update count for ${customer.Phone}: ${err.message}`);
+                }
+            }
+            
+            console.log('Contact count update completed');
+            
+        } finally {
+            connection.release();
+        }
+    }
+
     // Get status using our database
     async getStatus() {
         await this.initialize();
