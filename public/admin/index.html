@@ -32,7 +32,6 @@
             min-height: 100vh;
         }
         
-        /* Login Page */
         .login-container {
             min-height: 100vh;
             display: flex;
@@ -50,23 +49,9 @@
             max-width: 400px;
         }
         
-        .login-card h1 {
-            text-align: center;
-            margin-bottom: 2rem;
-            font-size: 1.75rem;
-        }
-        
-        .form-group {
-            margin-bottom: 1.25rem;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            font-size: 0.95rem;
-        }
-        
+        .login-card h1 { text-align: center; margin-bottom: 2rem; font-size: 1.75rem; }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
         .form-group input {
             width: 100%;
             padding: 0.875rem 1rem;
@@ -74,13 +59,8 @@
             border-radius: 8px;
             font-size: 1rem;
             font-family: inherit;
-            transition: border-color 0.2s;
         }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
+        .form-group input:focus { outline: none; border-color: var(--primary); }
         
         .btn {
             display: inline-flex;
@@ -96,17 +76,14 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        
         .btn-block { width: 100%; }
-        
-        .btn-primary {
-            background: var(--primary);
-            color: var(--white);
-        }
-        
-        .btn-primary:hover {
-            background: var(--primary-hover);
-        }
+        .btn-primary { background: var(--primary); color: var(--white); }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-sm { padding: 0.5rem 1rem; font-size: 0.9rem; }
+        .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text); }
+        .btn-outline:hover { background: var(--bg); }
+        .btn-danger { background: var(--danger); color: var(--white); }
+        .btn-success { background: var(--success); color: var(--white); }
         
         .btn-google {
             background: var(--white);
@@ -115,26 +92,15 @@
             margin-top: 1rem;
             width: 100%;
         }
-        
-        .btn-google:hover {
-            background: var(--bg);
-        }
+        .btn-google:hover { background: var(--bg); }
         
         .divider {
             display: flex;
             align-items: center;
             margin: 1.5rem 0;
             color: var(--text-light);
-            font-size: 0.9rem;
         }
-        
-        .divider::before, .divider::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: var(--border);
-        }
-        
+        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
         .divider::before { margin-left: 1rem; }
         .divider::after { margin-right: 1rem; }
         
@@ -144,13 +110,10 @@
             padding: 0.75rem 1rem;
             border-radius: 8px;
             margin-bottom: 1rem;
-            font-size: 0.95rem;
             display: none;
         }
-        
         .error-msg.show { display: block; }
         
-        /* Dashboard */
         .dashboard { display: none; }
         .dashboard.active { display: block; }
         .login-page.hidden { display: none; }
@@ -166,104 +129,98 @@
             top: 0;
             z-index: 100;
         }
+        .header h1 { font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
+        .header-actions { display: flex; gap: 1rem; align-items: center; }
         
-        .header h1 {
-            font-size: 1.5rem;
+        .main-content { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+        
+        /* Tabs */
+        .tabs {
             display: flex;
-            align-items: center;
-            gap: 10px;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.5rem;
         }
-        
-        .header-actions {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
+        .tab {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-light);
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.2s;
         }
-        
-        .btn-sm {
-            padding: 0.5rem 1rem;
-            font-size: 0.9rem;
-        }
-        
-        .btn-outline {
-            background: transparent;
-            border: 2px solid var(--border);
-            color: var(--text);
-        }
-        
-        .btn-outline:hover {
-            background: var(--bg);
-        }
-        
-        .btn-danger {
-            background: var(--danger);
-            color: var(--white);
-        }
-        
-        .btn-success {
-            background: var(--success);
-            color: var(--white);
-        }
-        
-        .main-content {
-            padding: 2rem;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
+        .tab:hover { background: var(--bg); }
+        .tab.active { background: var(--primary); color: white; }
         
         /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 1rem;
             margin-bottom: 2rem;
         }
-        
         .stat-card {
             background: var(--white);
             border-radius: var(--radius);
             padding: 1.25rem;
             box-shadow: var(--shadow);
         }
-        
-        .stat-card h3 {
-            color: var(--text-light);
-            font-size: 0.85rem;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-        }
-        
-        .stat-card .value {
-            font-size: 1.75rem;
-            font-weight: 700;
-        }
-        
+        .stat-card h3 { color: var(--text-light); font-size: 0.85rem; margin-bottom: 0.5rem; }
+        .stat-card .value { font-size: 1.75rem; font-weight: 700; }
         .stat-card .value.primary { color: var(--primary); }
         .stat-card .value.success { color: var(--success); }
         .stat-card .value.warning { color: var(--warning); }
         .stat-card .value.danger { color: var(--danger); }
         
-        /* Customer Cards */
-        .section-header {
+        /* Search and Filters */
+        .filters {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
+            gap: 1rem;
             margin-bottom: 1.5rem;
-        }
-        
-        .section-header h2 {
-            font-size: 1.25rem;
-            display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 8px;
+        }
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        .search-box input:focus { outline: none; border-color: var(--primary); }
+        .search-box::before {
+            content: '🔍';
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .filter-select {
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            background: var(--white);
+            cursor: pointer;
         }
         
+        /* Customer Cards */
         .customers-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 1.5rem;
         }
-        
         .customer-card {
             background: var(--white);
             border-radius: var(--radius);
@@ -272,12 +229,10 @@
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
         }
-        
         .customer-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 8px 30px rgba(0,0,0,0.12);
         }
-        
         .customer-card-header {
             padding: 1.25rem;
             border-bottom: 1px solid var(--border);
@@ -285,25 +240,9 @@
             align-items: center;
             justify-content: space-between;
         }
-        
-        .customer-info h3 {
-            font-size: 1.1rem;
-            margin-bottom: 0.25rem;
-        }
-        
-        .customer-info .phone {
-            color: var(--text-light);
-            font-size: 0.9rem;
-            direction: ltr;
-            text-align: right;
-        }
-        
-        .customer-status {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 4px;
-        }
+        .customer-info h3 { font-size: 1.1rem; margin-bottom: 0.25rem; }
+        .customer-info .phone { color: var(--text-light); font-size: 0.9rem; direction: ltr; text-align: right; }
+        .customer-status { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
         
         .badge {
             display: inline-block;
@@ -312,21 +251,9 @@
             font-size: 0.75rem;
             font-weight: 600;
         }
-        
-        .badge-success {
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--success);
-        }
-        
-        .badge-warning {
-            background: rgba(245, 158, 11, 0.1);
-            color: var(--warning);
-        }
-        
-        .badge-danger {
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--danger);
-        }
+        .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .badge-warning { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+        .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
         
         .customer-card-stats {
             padding: 1.25rem;
@@ -335,21 +262,9 @@
             gap: 0.5rem;
             text-align: center;
         }
-        
-        .mini-stat {
-            padding: 0.5rem;
-        }
-        
-        .mini-stat .label {
-            font-size: 0.75rem;
-            color: var(--text-light);
-            margin-bottom: 0.25rem;
-        }
-        
-        .mini-stat .value {
-            font-size: 1.25rem;
-            font-weight: 700;
-        }
+        .mini-stat { padding: 0.5rem; }
+        .mini-stat .label { font-size: 0.75rem; color: var(--text-light); margin-bottom: 0.25rem; }
+        .mini-stat .value { font-size: 1.25rem; font-weight: 700; }
         
         .customer-card-footer {
             padding: 1rem 1.25rem;
@@ -360,7 +275,6 @@
             font-size: 0.85rem;
             color: var(--text-light);
         }
-        
         .last-hour-badge {
             background: var(--success);
             color: white;
@@ -369,7 +283,29 @@
             font-weight: 600;
         }
         
-        /* Customer Detail Modal */
+        /* Campaign Cards */
+        .campaign-card {
+            background: var(--white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .campaign-card:hover { transform: translateY(-2px); }
+        .campaign-card h3 { margin-bottom: 0.75rem; font-size: 1.1rem; }
+        .campaign-stats {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .campaign-stats .stat {
+            text-align: center;
+        }
+        .campaign-stats .stat .label { font-size: 0.75rem; color: var(--text-light); }
+        .campaign-stats .stat .value { font-size: 1.25rem; font-weight: 700; }
+        
+        /* Modal */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -383,11 +319,7 @@
             z-index: 1000;
             padding: 2rem;
         }
-        
-        .modal-overlay.active {
-            display: flex;
-        }
-        
+        .modal-overlay.active { display: flex; }
         .modal {
             background: var(--white);
             border-radius: var(--radius);
@@ -398,7 +330,6 @@
             display: flex;
             flex-direction: column;
         }
-        
         .modal-header {
             padding: 1.5rem;
             border-bottom: 1px solid var(--border);
@@ -406,11 +337,7 @@
             align-items: center;
             justify-content: space-between;
         }
-        
-        .modal-header h2 {
-            font-size: 1.5rem;
-        }
-        
+        .modal-header h2 { font-size: 1.5rem; }
         .modal-close {
             background: none;
             border: none;
@@ -419,66 +346,40 @@
             color: var(--text-light);
             padding: 0.5rem;
         }
-        
-        .modal-body {
-            padding: 1.5rem;
-            overflow-y: auto;
-            flex: 1;
-        }
+        .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
         
         .detail-summary {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 1rem;
             margin-bottom: 2rem;
         }
-        
         .detail-stat {
             background: var(--bg);
             border-radius: 8px;
             padding: 1rem;
             text-align: center;
         }
-        
-        .detail-stat .label {
-            font-size: 0.8rem;
-            color: var(--text-light);
-            margin-bottom: 0.5rem;
-        }
-        
-        .detail-stat .value {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-        
-        .campaigns-section h3 {
-            margin-bottom: 1rem;
-            font-size: 1.1rem;
-        }
+        .detail-stat .label { font-size: 0.8rem; color: var(--text-light); margin-bottom: 0.5rem; }
+        .detail-stat .value { font-size: 1.5rem; font-weight: 700; }
         
         .campaign-table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 2rem;
         }
-        
-        .campaign-table th,
-        .campaign-table td {
+        .campaign-table th, .campaign-table td {
             padding: 0.875rem 1rem;
             text-align: right;
             border-bottom: 1px solid var(--border);
         }
-        
         .campaign-table th {
             background: var(--bg);
             font-weight: 600;
             font-size: 0.85rem;
             color: var(--text-light);
         }
-        
-        .campaign-table tr:hover td {
-            background: rgba(67, 97, 238, 0.05);
-        }
+        .campaign-table tr:hover td { background: rgba(67, 97, 238, 0.05); }
         
         .error-alert {
             background: rgba(239, 68, 68, 0.1);
@@ -486,30 +387,21 @@
             border-radius: 8px;
             padding: 1rem;
             margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        }
+        .error-alert .type { font-weight: 600; color: var(--danger); margin-bottom: 0.5rem; }
+        .error-alert .message { color: var(--text); }
+        
+        .labels-section { margin-bottom: 1.5rem; }
+        .labels-list { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+        .label-tag {
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
         }
         
-        .error-alert .icon {
-            font-size: 1.5rem;
-        }
-        
-        .error-alert .text {
-            flex: 1;
-        }
-        
-        .error-alert .type {
-            font-weight: 600;
-            color: var(--danger);
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 3rem;
-            color: var(--text-light);
-        }
-        
+        .loading { text-align: center; padding: 3rem; color: var(--text-light); }
         .spinner {
             width: 40px;
             height: 40px;
@@ -519,30 +411,22 @@
             animation: spin 1s linear infinite;
             margin: 0 auto 1rem;
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
         
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .section-title { margin: 1rem 0; font-size: 1rem; color: var(--text-light); }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-light);
         }
         
         @media (max-width: 768px) {
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-                padding: 1rem;
-            }
-            
-            .main-content {
-                padding: 1rem;
-            }
-            
-            .customers-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .modal {
-                max-height: 100vh;
-                border-radius: 0;
-            }
+            .header { flex-direction: column; gap: 1rem; padding: 1rem; }
+            .main-content { padding: 1rem; }
+            .customers-grid { grid-template-columns: 1fr; }
+            .filters { flex-direction: column; }
+            .search-box { width: 100%; }
         }
     </style>
 </head>
@@ -551,22 +435,21 @@
     <div id="loginPage" class="login-container login-page">
         <div class="login-card">
             <h1>🔐 כניסת מנהל</h1>
-            
             <div id="errorMsg" class="error-msg"></div>
             
             <form id="setupForm" style="display: none;">
-                <p style="margin-bottom: 1.5rem; color: var(--text-light);">יצירת סיסמה חדשה למערכת</p>
+                <p style="margin-bottom: 1.5rem; color: var(--text-light);">יצירת סיסמה חדשה</p>
                 <div class="form-group">
                     <label>אימייל</label>
                     <input type="email" id="setupEmail" placeholder="office@neriyabudraham.co.il" required>
                 </div>
                 <div class="form-group">
                     <label>סיסמה חדשה</label>
-                    <input type="password" id="setupPassword" placeholder="לפחות 6 תווים" minlength="6" required>
+                    <input type="password" id="setupPassword" minlength="6" required>
                 </div>
                 <div class="form-group">
                     <label>אימות סיסמה</label>
-                    <input type="password" id="setupPasswordConfirm" placeholder="הקלד שוב" required>
+                    <input type="password" id="setupPasswordConfirm" required>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">צור סיסמה</button>
             </form>
@@ -574,66 +457,62 @@
             <form id="loginForm" style="display: none;">
                 <div class="form-group">
                     <label>אימייל</label>
-                    <input type="email" id="loginEmail" placeholder="office@neriyabudraham.co.il" required>
+                    <input type="email" id="loginEmail" required>
                 </div>
                 <div class="form-group">
                     <label>סיסמה</label>
-                    <input type="password" id="loginPassword" placeholder="הכנס סיסמה" required>
+                    <input type="password" id="loginPassword" required>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">התחבר</button>
-                
                 <div class="divider">או</div>
-                
                 <a href="/admin/google-auth" class="btn btn-google">
-                    <svg width="20" height="20" viewBox="0 0 48 48">
-                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                    </svg>
+                    <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                     התחבר עם Google
                 </a>
             </form>
             
-            <div id="loadingLogin" class="loading">
-                <div class="spinner"></div>
-                <p>טוען...</p>
-            </div>
+            <div id="loadingLogin" class="loading"><div class="spinner"></div><p>טוען...</p></div>
         </div>
     </div>
     
     <!-- Dashboard -->
     <div id="dashboard" class="dashboard">
         <header class="header">
-            <h1>📊 לוח בקרה - שמירת אנשי קשר</h1>
+            <h1>📊 ניהול שמירת אנשי קשר</h1>
             <div class="header-actions">
-                <button onclick="runSaver()" class="btn btn-sm btn-success">▶ הפעל שמירה</button>
+                <span id="autoSaveStatus" style="font-size: 0.85rem; color: var(--success);">🟢 שמירה אוטומטית פעילה</span>
                 <button onclick="migrateTokens()" class="btn btn-sm btn-outline">🔒 הצפן טוקנים</button>
                 <button onclick="logout()" class="btn btn-sm btn-danger">יציאה</button>
             </div>
         </header>
         
         <main class="main-content">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('customers')">👥 לקוחות</button>
+                <button class="tab" onclick="switchTab('campaigns')">📁 קמפיינים</button>
+            </div>
+            
             <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-card">
-                    <h3>סה"כ לקוחות</h3>
+                    <h3>לקוחות פעילים</h3>
                     <div class="value primary" id="totalCustomers">-</div>
                 </div>
                 <div class="stat-card">
-                    <h3>לקוחות מחוברים</h3>
+                    <h3>מחוברים</h3>
                     <div class="value success" id="connectedCustomers">-</div>
                 </div>
                 <div class="stat-card">
-                    <h3>לקוחות עם שגיאות</h3>
+                    <h3>עם שגיאות</h3>
                     <div class="value danger" id="errorCustomers">-</div>
                 </div>
                 <div class="stat-card">
-                    <h3>ממתינים לשמירה</h3>
+                    <h3>ממתינים</h3>
                     <div class="value warning" id="totalPending">-</div>
                 </div>
                 <div class="stat-card">
-                    <h3>נשמרו בשעה האחרונה</h3>
+                    <h3>נשמרו בשעה</h3>
                     <div class="value success" id="lastHourSaved">-</div>
                 </div>
                 <div class="stat-card">
@@ -642,22 +521,40 @@
                 </div>
             </div>
             
-            <!-- Customers -->
-            <div class="section-header">
-                <h2>👥 לקוחות</h2>
-                <button onclick="loadData()" class="btn btn-sm btn-outline">🔄 רענן</button>
+            <!-- Customers Tab -->
+            <div id="customersTab">
+                <div class="filters">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="חיפוש לפי שם, טלפון או אימייל..." oninput="filterCustomers()">
+                    </div>
+                    <select class="filter-select" id="sortSelect" onchange="sortCustomers()">
+                        <option value="relevance">מיון: רלוונטיות</option>
+                        <option value="pending">מיון: ממתינים לשמירה</option>
+                        <option value="saved">מיון: נשמרו</option>
+                        <option value="campaigns">מיון: מספר קמפיינים</option>
+                        <option value="name">מיון: שם</option>
+                    </select>
+                </div>
+                <div id="customersGrid" class="customers-grid">
+                    <div class="loading"><div class="spinner"></div><p>טוען...</p></div>
+                </div>
             </div>
             
-            <div id="customersGrid" class="customers-grid">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>טוען לקוחות...</p>
+            <!-- Campaigns Tab -->
+            <div id="campaignsTab" style="display: none;">
+                <div class="filters">
+                    <div class="search-box">
+                        <input type="text" id="campaignSearchInput" placeholder="חיפוש קמפיין..." oninput="filterCampaigns()">
+                    </div>
+                </div>
+                <div id="campaignsGrid" class="customers-grid">
+                    <div class="loading"><div class="spinner"></div><p>טוען...</p></div>
                 </div>
             </div>
         </main>
     </div>
     
-    <!-- Customer Detail Modal -->
+    <!-- Customer Modal -->
     <div id="customerModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
@@ -665,16 +562,33 @@
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
             <div class="modal-body" id="modalBody">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>טוען פרטים...</p>
-                </div>
+                <div class="loading"><div class="spinner"></div><p>טוען...</p></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Campaign Modal -->
+    <div id="campaignModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="campaignModalTitle">פרטי קמפיין</h2>
+                <button class="modal-close" onclick="closeCampaignModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="campaignModalBody">
+                <div class="loading"><div class="spinner"></div><p>טוען...</p></div>
             </div>
         </div>
     </div>
 
     <script>
         const API_BASE = '/admin';
+        let allCustomers = [];
+        let allCampaigns = [];
+        
+        // Format campaign name (replace _ with space)
+        function formatCampaignName(name) {
+            return name ? name.replace(/_/g, ' ') : '';
+        }
         
         async function init() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -683,36 +597,25 @@
             
             try {
                 const res = await fetch(`${API_BASE}/verify`, { credentials: 'include' });
-                if (res.ok) {
-                    showDashboard();
-                    return;
-                }
+                if (res.ok) { showDashboard(); return; }
             } catch (e) {}
             
             try {
                 const res = await fetch(`${API_BASE}/setup-status`);
                 const data = await res.json();
-                
                 document.getElementById('loadingLogin').style.display = 'none';
-                
                 if (data.hasPassword) {
                     document.getElementById('loginForm').style.display = 'block';
                 } else {
                     document.getElementById('setupForm').style.display = 'block';
                 }
-            } catch (e) {
-                showError('שגיאה בטעינת הדף');
-            }
+            } catch (e) { showError('שגיאה בטעינה'); }
         }
         
         function showError(msg) {
             const el = document.getElementById('errorMsg');
             el.textContent = msg;
             el.classList.add('show');
-        }
-        
-        function hideError() {
-            document.getElementById('errorMsg').classList.remove('show');
         }
         
         function showDashboard() {
@@ -723,63 +626,38 @@
         
         document.getElementById('setupForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            hideError();
-            
             const email = document.getElementById('setupEmail').value;
             const password = document.getElementById('setupPassword').value;
             const confirm = document.getElementById('setupPasswordConfirm').value;
+            if (password !== confirm) { showError('סיסמאות לא תואמות'); return; }
             
-            if (password !== confirm) {
-                showError('הסיסמאות לא תואמות');
-                return;
-            }
-            
-            try {
-                const res = await fetch(`${API_BASE}/setup`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-                
-                const data = await res.json();
-                if (!res.ok) {
-                    showError(data.error);
-                    return;
-                }
-                
+            const res = await fetch(`${API_BASE}/setup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            if (res.ok) {
                 document.getElementById('setupForm').style.display = 'none';
                 document.getElementById('loginForm').style.display = 'block';
-                document.getElementById('loginEmail').value = email;
-            } catch (e) {
-                showError('שגיאה ביצירת הסיסמה');
+            } else {
+                const data = await res.json();
+                showError(data.error);
             }
         });
         
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            hideError();
-            
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
             
-            try {
-                const res = await fetch(`${API_BASE}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password }),
-                    credentials: 'include'
-                });
-                
-                const data = await res.json();
-                if (!res.ok) {
-                    showError(data.error);
-                    return;
-                }
-                
-                showDashboard();
-            } catch (e) {
-                showError('שגיאה בהתחברות');
-            }
+            const res = await fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+                credentials: 'include'
+            });
+            if (res.ok) { showDashboard(); }
+            else { const data = await res.json(); showError(data.error); }
         });
         
         async function logout() {
@@ -787,14 +665,22 @@
             location.reload();
         }
         
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('customersTab').style.display = tab === 'customers' ? 'block' : 'none';
+            document.getElementById('campaignsTab').style.display = tab === 'campaigns' ? 'block' : 'none';
+            
+            if (tab === 'campaigns' && allCampaigns.length === 0) {
+                loadCampaigns();
+            }
+        }
+        
         async function loadData() {
             try {
-                // Load summary stats
                 const statusRes = await fetch(`${API_BASE}/status`, { credentials: 'include' });
-                if (!statusRes.ok) {
-                    if (statusRes.status === 401) location.reload();
-                    return;
-                }
+                if (!statusRes.ok) { if (statusRes.status === 401) location.reload(); return; }
                 const status = await statusRes.json();
                 
                 document.getElementById('totalCustomers').textContent = status.total_customers || 0;
@@ -804,66 +690,77 @@
                 document.getElementById('lastHourSaved').textContent = status.last_hour_saved || 0;
                 document.getElementById('totalSaved').textContent = Number(status.total_saved || 0).toLocaleString();
                 
-                // Load customers
                 const customersRes = await fetch(`${API_BASE}/customers`, { credentials: 'include' });
-                const customers = await customersRes.json();
-                
-                renderCustomers(customers);
-            } catch (e) {
-                console.error('Load data error:', e);
+                allCustomers = await customersRes.json();
+                renderCustomers(allCustomers);
+            } catch (e) { console.error('Load error:', e); }
+        }
+        
+        async function loadCampaigns() {
+            try {
+                const res = await fetch(`${API_BASE}/campaigns`, { credentials: 'include' });
+                allCampaigns = await res.json();
+                renderCampaigns(allCampaigns);
+            } catch (e) { console.error('Load campaigns error:', e); }
+        }
+        
+        function filterCustomers() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allCustomers.filter(c => 
+                (c.full_name || '').toLowerCase().includes(search) ||
+                (c.phone || '').includes(search) ||
+                (c.email || '').toLowerCase().includes(search)
+            );
+            renderCustomers(filtered);
+        }
+        
+        function sortCustomers() {
+            const sort = document.getElementById('sortSelect').value;
+            let sorted = [...allCustomers];
+            
+            switch(sort) {
+                case 'pending':
+                    sorted.sort((a, b) => Number(b.total_pending || 0) - Number(a.total_pending || 0));
+                    break;
+                case 'saved':
+                    sorted.sort((a, b) => Number(b.total_saved || 0) - Number(a.total_saved || 0));
+                    break;
+                case 'campaigns':
+                    sorted.sort((a, b) => Number(b.campaign_count || 0) - Number(a.campaign_count || 0));
+                    break;
+                case 'name':
+                    sorted.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+                    break;
             }
+            renderCustomers(sorted);
+        }
+        
+        function filterCampaigns() {
+            const search = document.getElementById('campaignSearchInput').value.toLowerCase();
+            const filtered = allCampaigns.filter(c => 
+                formatCampaignName(c.campaign_name).toLowerCase().includes(search)
+            );
+            renderCampaigns(filtered);
         }
         
         function renderCustomers(customers) {
             const grid = document.getElementById('customersGrid');
             
             if (!customers || customers.length === 0) {
-                grid.innerHTML = '<p style="color: var(--text-light); text-align: center; padding: 2rem;">אין לקוחות להצגה</p>';
+                grid.innerHTML = '<div class="empty-state">אין לקוחות להצגה</div>';
                 return;
             }
             
-            // Split into active and inactive
-            const activeCustomers = customers.filter(c => 
-                Number(c.total_pending) > 0 || c.last_month_activity > 0 || c.has_valid_tokens
-            );
-            const inactiveCustomers = customers.filter(c => 
-                Number(c.total_pending) === 0 && !c.last_month_activity && !c.has_valid_tokens
-            );
-            
-            let html = '';
-            
-            if (activeCustomers.length > 0) {
-                html += `<div class="section-divider" style="grid-column: 1/-1; margin: 0.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--success); color: var(--success); font-weight: 600;">🟢 לקוחות פעילים (${activeCustomers.length})</div>`;
-                html += activeCustomers.map(c => renderCustomerCard(c)).join('');
-            }
-            
-            if (inactiveCustomers.length > 0) {
-                html += `<div class="section-divider" style="grid-column: 1/-1; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--text-light); color: var(--text-light); font-weight: 600;">⚪ לקוחות לא פעילים (${inactiveCustomers.length})</div>`;
-                html += inactiveCustomers.map(c => renderCustomerCard(c, true)).join('');
-            }
-            
-            grid.innerHTML = html;
-        }
-        
-        function renderCustomerCard(c, inactive = false) {
-            const opacity = inactive ? 'opacity: 0.7;' : '';
-            return `
-                <div class="customer-card" onclick="openCustomerDetail('${c.phone}')" style="${opacity}">
+            grid.innerHTML = customers.map(c => `
+                <div class="customer-card" onclick="openCustomerDetail('${c.phone}')">
                     <div class="customer-card-header">
                         <div class="customer-info">
                             <h3>${c.full_name || 'ללא שם'}</h3>
                             <div class="phone">${c.phone || '-'}</div>
                         </div>
                         <div class="customer-status">
-                            ${c.has_valid_tokens 
-                                ? '<span class="badge badge-success">מחובר</span>' 
-                                : '<span class="badge badge-warning">לא מחובר</span>'}
-                            ${c.last_error 
-                                ? '<span class="badge badge-danger">שגיאה</span>' 
-                                : ''}
-                            ${Number(c.total_pending) > 0 
-                                ? '<span class="badge badge-warning">ממתינים</span>' 
-                                : ''}
+                            ${c.has_valid_tokens ? '<span class="badge badge-success">מחובר</span>' : '<span class="badge badge-warning">לא מחובר</span>'}
+                            ${c.last_error ? '<span class="badge badge-danger">שגיאה</span>' : ''}
                         </div>
                     </div>
                     <div class="customer-card-stats">
@@ -886,65 +783,78 @@
                     </div>
                     <div class="customer-card-footer">
                         <span>${c.email || '-'}</span>
-                        ${c.last_hour_saved > 0 
-                            ? `<span class="last-hour-badge">+${c.last_hour_saved} בשעה</span>` 
-                            : c.last_month_activity > 0 
-                                ? `<span style="font-size: 0.8rem; color: var(--success);">פעיל החודש</span>`
-                                : ''}
+                        ${c.last_hour_saved > 0 ? `<span class="last-hour-badge">+${c.last_hour_saved} בשעה</span>` : ''}
                     </div>
                 </div>
-            `;
+            `).join('');
+        }
+        
+        function renderCampaigns(campaigns) {
+            const grid = document.getElementById('campaignsGrid');
+            
+            if (!campaigns || campaigns.length === 0) {
+                grid.innerHTML = '<div class="empty-state">אין קמפיינים להצגה</div>';
+                return;
+            }
+            
+            grid.innerHTML = campaigns.map(c => `
+                <div class="campaign-card" onclick="openCampaignDetail('${encodeURIComponent(c.campaign_name)}')">
+                    <h3>📁 ${formatCampaignName(c.campaign_name)}</h3>
+                    <div class="campaign-stats">
+                        <div class="stat">
+                            <div class="label">לקוחות</div>
+                            <div class="value" style="color: var(--primary)">${c.customer_count}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="label">ממתינים</div>
+                            <div class="value" style="color: var(--warning)">${Number(c.total_pending || 0).toLocaleString()}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="label">נשמרו</div>
+                            <div class="value" style="color: var(--success)">${Number(c.total_saved || 0).toLocaleString()}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="label">קיימים</div>
+                            <div class="value">${Number(c.total_existed || 0).toLocaleString()}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
         }
         
         async function openCustomerDetail(phone) {
             document.getElementById('customerModal').classList.add('active');
-            document.getElementById('modalBody').innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>טוען פרטים...</p>
-                </div>
-            `;
+            document.getElementById('modalBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             
             try {
                 const res = await fetch(`${API_BASE}/customers/${phone}`, { credentials: 'include' });
                 const data = await res.json();
-                
-                if (!res.ok) {
-                    document.getElementById('modalBody').innerHTML = `<p>שגיאה: ${data.error}</p>`;
-                    return;
-                }
-                
+                if (!res.ok) { document.getElementById('modalBody').innerHTML = `<p>שגיאה: ${data.error}</p>`; return; }
                 renderCustomerDetail(data);
-            } catch (e) {
-                document.getElementById('modalBody').innerHTML = `<p>שגיאה בטעינת הנתונים</p>`;
-            }
+            } catch (e) { document.getElementById('modalBody').innerHTML = '<p>שגיאה בטעינה</p>'; }
         }
         
         function renderCustomerDetail(data) {
             const { customer, campaigns, summary, recentActivity } = data;
-            
             document.getElementById('modalTitle').textContent = customer.full_name || customer.phone;
             
             let html = '';
             
-            // Error alert
+            // Error alert with details
             if (customer.last_error) {
                 html += `
                     <div class="error-alert">
-                        <span class="icon">⚠️</span>
-                        <div class="text">
-                            <div class="type">${customer.last_error_type || 'שגיאה'}</div>
-                            <div>${customer.last_error}</div>
-                        </div>
+                        <div class="type">⚠️ ${customer.last_error_type || 'שגיאה'}</div>
+                        <div class="message">${customer.last_error}</div>
                     </div>
                 `;
             }
             
-            // Summary stats
+            // Summary
             html += `
                 <div class="detail-summary">
                     <div class="detail-stat">
-                        <div class="label">סה"כ אנשי קשר</div>
+                        <div class="label">סה"כ</div>
                         <div class="value" style="color: var(--primary)">${Number(summary.total_contacts).toLocaleString()}</div>
                     </div>
                     <div class="detail-stat">
@@ -956,153 +866,182 @@
                         <div class="value" style="color: var(--success)">${Number(summary.total_saved).toLocaleString()}</div>
                     </div>
                     <div class="detail-stat">
-                        <div class="label">כבר קיימים</div>
-                        <div class="value" style="color: var(--text-light)">${Number(summary.total_existed).toLocaleString()}</div>
+                        <div class="label">קיימים</div>
+                        <div class="value">${Number(summary.total_existed).toLocaleString()}</div>
                     </div>
                     <div class="detail-stat">
-                        <div class="label">נשמרו בשעה</div>
+                        <div class="label">בשעה</div>
                         <div class="value" style="color: var(--success)">${summary.last_hour_saved}</div>
                     </div>
                 </div>
             `;
             
+            // Labels (campaign names as labels)
+            if (campaigns && campaigns.length > 0) {
+                html += `
+                    <div class="labels-section">
+                        <h3>🏷️ תוויות (${campaigns.length})</h3>
+                        <div class="labels-list">
+                            ${campaigns.map(c => `<span class="label-tag">${formatCampaignName(c.campaign_name)}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
             // Campaigns table
             if (campaigns && campaigns.length > 0) {
                 html += `
-                    <div class="campaigns-section">
-                        <h3>📁 קמפיינים (${campaigns.length})</h3>
-                        <table class="campaign-table">
-                            <thead>
+                    <h3 style="margin: 1.5rem 0 1rem;">📁 קמפיינים</h3>
+                    <table class="campaign-table">
+                        <thead>
+                            <tr>
+                                <th>קמפיין</th>
+                                <th>סה"כ</th>
+                                <th>ממתינים</th>
+                                <th>נשמרו</th>
+                                <th>קיימים</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${campaigns.map(c => `
                                 <tr>
-                                    <th>שם קמפיין</th>
-                                    <th>סה"כ</th>
-                                    <th>ממתינים</th>
-                                    <th>נשמרו</th>
-                                    <th>קיימים</th>
-                                    <th>עדכון אחרון</th>
+                                    <td><strong>${formatCampaignName(c.campaign_name)}</strong></td>
+                                    <td>${c.total_contacts}</td>
+                                    <td style="color: var(--warning)">${c.pending_count}</td>
+                                    <td style="color: var(--success)">${c.saved_count}</td>
+                                    <td>${c.existed_count}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                ${campaigns.map(c => `
-                                    <tr>
-                                        <td><strong>${c.campaign_name}</strong></td>
-                                        <td>${c.total_contacts}</td>
-                                        <td style="color: var(--warning)">${c.pending_count}</td>
-                                        <td style="color: var(--success)">${c.saved_count}</td>
-                                        <td>${c.existed_count}</td>
-                                        <td style="font-size: 0.85rem; color: var(--text-light)">
-                                            ${c.last_processed ? new Date(c.last_processed).toLocaleString('he-IL') : '-'}
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 `;
             }
             
             // Recent activity
             if (recentActivity && recentActivity.length > 0) {
                 html += `
-                    <div class="campaigns-section">
-                        <h3>📋 פעילות אחרונה</h3>
-                        <table class="campaign-table">
-                            <thead>
+                    <h3 style="margin: 1.5rem 0 1rem;">📋 פעילות אחרונה</h3>
+                    <table class="campaign-table">
+                        <thead>
+                            <tr><th>שם</th><th>טלפון</th><th>קמפיין</th><th>סטטוס</th><th>זמן</th></tr>
+                        </thead>
+                        <tbody>
+                            ${recentActivity.slice(0, 15).map(a => `
                                 <tr>
-                                    <th>שם</th>
-                                    <th>טלפון</th>
-                                    <th>קמפיין</th>
-                                    <th>סטטוס</th>
-                                    <th>זמן</th>
+                                    <td>${a.contact_name || '-'}</td>
+                                    <td dir="ltr">${a.contact_phone}</td>
+                                    <td style="font-size: 0.85rem">${formatCampaignName(a.campaign_name)}</td>
+                                    <td>
+                                        <span class="badge ${a.status === 'saved' ? 'badge-success' : a.status === 'existed' ? 'badge-warning' : a.status === 'error' ? 'badge-danger' : ''}">
+                                            ${a.status === 'saved' ? 'נשמר' : a.status === 'existed' ? 'קיים' : a.status === 'error' ? 'שגיאה' : a.status}
+                                        </span>
+                                        ${a.status === 'error' && a.error_message ? `<div style="font-size: 0.75rem; color: var(--danger); margin-top: 2px;">${a.error_message}</div>` : ''}
+                                    </td>
+                                    <td style="font-size: 0.8rem">${a.processed_at ? new Date(a.processed_at).toLocaleString('he-IL') : '-'}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                ${recentActivity.slice(0, 20).map(a => `
-                                    <tr>
-                                        <td>${a.contact_name || '-'}</td>
-                                        <td dir="ltr">${a.contact_phone}</td>
-                                        <td style="font-size: 0.85rem">${a.campaign_name}</td>
-                                        <td>
-                                            <span class="badge ${
-                                                a.status === 'saved' ? 'badge-success' :
-                                                a.status === 'existed' ? 'badge-warning' :
-                                                a.status === 'error' ? 'badge-danger' : ''
-                                            }">
-                                                ${a.status === 'saved' ? 'נשמר' :
-                                                  a.status === 'existed' ? 'קיים' :
-                                                  a.status === 'error' ? 'שגיאה' : a.status}
-                                            </span>
-                                        </td>
-                                        <td style="font-size: 0.8rem; color: var(--text-light)">
-                                            ${a.processed_at ? new Date(a.processed_at).toLocaleString('he-IL') : '-'}
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 `;
             }
             
             document.getElementById('modalBody').innerHTML = html;
         }
         
-        function closeModal() {
-            document.getElementById('customerModal').classList.remove('active');
-        }
-        
-        // Close modal on click outside
-        document.getElementById('customerModal').addEventListener('click', (e) => {
-            if (e.target.id === 'customerModal') closeModal();
-        });
-        
-        // Close modal on Escape
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeModal();
-        });
-        
-        async function runSaver() {
-            try {
-                const res = await fetch(`${API_BASE}/run-saver`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-                
-                if (res.ok) {
-                    alert('שמירת אנשי קשר הופעלה');
-                    setTimeout(loadData, 5000);
-                }
-            } catch (e) {
-                alert('שגיאה בהפעלת השמירה');
-            }
-        }
-        
-        async function migrateTokens() {
-            if (!confirm('האם להצפין את כל הטוקנים הקיימים?')) return;
+        async function openCampaignDetail(encodedName) {
+            document.getElementById('campaignModal').classList.add('active');
+            document.getElementById('campaignModalBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             
             try {
-                const res = await fetch(`${API_BASE}/migrate-tokens`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-                
+                const res = await fetch(`${API_BASE}/campaigns/${encodedName}`, { credentials: 'include' });
                 const data = await res.json();
-                
-                if (res.ok) {
-                    alert(`הצפנה הושלמה!\nהוצפנו: ${data.migrated}\nכבר מוצפנים: ${data.skipped}`);
-                } else {
-                    alert('שגיאה בהצפנה: ' + data.error);
-                }
-            } catch (e) {
-                alert('שגיאה בהצפנת הטוקנים');
-            }
+                if (!res.ok) { document.getElementById('campaignModalBody').innerHTML = `<p>שגיאה</p>`; return; }
+                renderCampaignDetail(data);
+            } catch (e) { document.getElementById('campaignModalBody').innerHTML = '<p>שגיאה בטעינה</p>'; }
         }
         
-        // Auto refresh every 30 seconds
-        setInterval(() => {
-            if (document.getElementById('dashboard').classList.contains('active')) {
-                loadData();
+        function renderCampaignDetail(data) {
+            const { campaign_name, customers, summary } = data;
+            document.getElementById('campaignModalTitle').textContent = formatCampaignName(campaign_name);
+            
+            let html = `
+                <div class="detail-summary">
+                    <div class="detail-stat">
+                        <div class="label">לקוחות</div>
+                        <div class="value" style="color: var(--primary)">${summary.total_customers}</div>
+                    </div>
+                    <div class="detail-stat">
+                        <div class="label">סה"כ</div>
+                        <div class="value">${Number(summary.total_contacts).toLocaleString()}</div>
+                    </div>
+                    <div class="detail-stat">
+                        <div class="label">ממתינים</div>
+                        <div class="value" style="color: var(--warning)">${Number(summary.total_pending).toLocaleString()}</div>
+                    </div>
+                    <div class="detail-stat">
+                        <div class="label">נשמרו</div>
+                        <div class="value" style="color: var(--success)">${Number(summary.total_saved).toLocaleString()}</div>
+                    </div>
+                    <div class="detail-stat">
+                        <div class="label">קיימים</div>
+                        <div class="value">${Number(summary.total_existed).toLocaleString()}</div>
+                    </div>
+                </div>
+            `;
+            
+            if (customers && customers.length > 0) {
+                html += `
+                    <h3 style="margin: 1.5rem 0 1rem;">👥 לקוחות בקמפיין</h3>
+                    <table class="campaign-table">
+                        <thead>
+                            <tr>
+                                <th>שם</th>
+                                <th>טלפון</th>
+                                <th>סטטוס</th>
+                                <th>ממתינים</th>
+                                <th>נשמרו</th>
+                                <th>קיימים</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${customers.map(c => `
+                                <tr onclick="closeModals(); openCustomerDetail('${c.customer_phone}')" style="cursor: pointer;">
+                                    <td><strong>${c.full_name || 'ללא שם'}</strong></td>
+                                    <td dir="ltr">${c.customer_phone}</td>
+                                    <td>
+                                        ${c.has_valid_tokens ? '<span class="badge badge-success">מחובר</span>' : '<span class="badge badge-warning">לא מחובר</span>'}
+                                        ${c.last_error ? '<span class="badge badge-danger">שגיאה</span>' : ''}
+                                    </td>
+                                    <td style="color: var(--warning)">${c.pending_count}</td>
+                                    <td style="color: var(--success)">${c.saved_count}</td>
+                                    <td>${c.existed_count}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
             }
+            
+            document.getElementById('campaignModalBody').innerHTML = html;
+        }
+        
+        function closeModal() { document.getElementById('customerModal').classList.remove('active'); }
+        function closeCampaignModal() { document.getElementById('campaignModal').classList.remove('active'); }
+        function closeModals() { closeModal(); closeCampaignModal(); }
+        
+        document.getElementById('customerModal').addEventListener('click', (e) => { if (e.target.id === 'customerModal') closeModal(); });
+        document.getElementById('campaignModal').addEventListener('click', (e) => { if (e.target.id === 'campaignModal') closeCampaignModal(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModals(); });
+        
+        async function migrateTokens() {
+            if (!confirm('להצפין את כל הטוקנים?')) return;
+            const res = await fetch(`${API_BASE}/migrate-tokens`, { method: 'POST', credentials: 'include' });
+            const data = await res.json();
+            alert(res.ok ? `הוצפנו: ${data.migrated}, כבר מוצפנים: ${data.skipped}` : 'שגיאה');
+        }
+        
+        setInterval(() => {
+            if (document.getElementById('dashboard').classList.contains('active')) loadData();
         }, 30000);
         
         init();

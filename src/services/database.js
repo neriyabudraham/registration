@@ -222,10 +222,11 @@ class DatabaseService {
         }
     }
 
-    // Get all customers with summary stats
+    // Get all customers with summary stats (ONLY customers that appear in campaigns)
     async getCustomersWithStats() {
         const connection = await this.pool.getConnection();
         try {
+            // Only get customers that have campaign stats (meaning they appear in campaigns)
             const [customers] = await connection.execute(`
                 SELECT 
                     c.*,
@@ -236,9 +237,10 @@ class DatabaseService {
                     COUNT(DISTINCT s.campaign_name) as campaign_count,
                     MAX(s.last_processed) as last_activity
                 FROM cs_customers c
-                LEFT JOIN cs_campaign_stats s ON c.phone = s.customer_phone
+                INNER JOIN cs_campaign_stats s ON c.phone = s.customer_phone
                 WHERE c.is_active = TRUE
                 GROUP BY c.id
+                HAVING campaign_count > 0
             `);
 
             // Get last hour and last month saves for each customer
@@ -268,15 +270,75 @@ class DatabaseService {
                 const bPending = Number(b.total_pending) || 0;
                 const aMonthActivity = a.last_month_activity || 0;
                 const bMonthActivity = b.last_month_activity || 0;
+                const aCampaigns = Number(a.campaign_count) || 0;
+                const bCampaigns = Number(b.campaign_count) || 0;
                 
-                // Priority score: pending contacts + recent month activity
-                const aScore = (aPending > 0 ? 1000 : 0) + aMonthActivity + (a.has_valid_tokens ? 100 : 0);
-                const bScore = (bPending > 0 ? 1000 : 0) + bMonthActivity + (b.has_valid_tokens ? 100 : 0);
+                // Priority score: pending > recent activity > campaigns > connected
+                const aScore = (aPending > 0 ? 10000 : 0) + (aMonthActivity * 10) + (aCampaigns * 100) + (a.has_valid_tokens ? 50 : 0);
+                const bScore = (bPending > 0 ? 10000 : 0) + (bMonthActivity * 10) + (bCampaigns * 100) + (b.has_valid_tokens ? 50 : 0);
                 
                 return bScore - aScore;
             });
 
             return customers;
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Get all campaigns with stats
+    async getCampaignsWithStats() {
+        const connection = await this.pool.getConnection();
+        try {
+            const [campaigns] = await connection.execute(`
+                SELECT 
+                    campaign_name,
+                    COUNT(DISTINCT customer_phone) as customer_count,
+                    SUM(total_contacts) as total_contacts,
+                    SUM(pending_count) as total_pending,
+                    SUM(saved_count) as total_saved,
+                    SUM(existed_count) as total_existed,
+                    MAX(last_processed) as last_activity
+                FROM cs_campaign_stats
+                GROUP BY campaign_name
+                ORDER BY total_pending DESC, last_activity DESC
+            `);
+            
+            return campaigns;
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Get campaign details with all customers
+    async getCampaignDetails(campaignName) {
+        const connection = await this.pool.getConnection();
+        try {
+            // Get all customers in this campaign
+            const [customers] = await connection.execute(`
+                SELECT 
+                    s.*,
+                    c.full_name,
+                    c.email,
+                    c.has_valid_tokens,
+                    c.last_error,
+                    c.last_error_type
+                FROM cs_campaign_stats s
+                JOIN cs_customers c ON s.customer_phone = c.phone
+                WHERE s.campaign_name = ?
+                ORDER BY s.pending_count DESC, s.saved_count DESC
+            `, [campaignName]);
+            
+            // Summary
+            const summary = {
+                total_customers: customers.length,
+                total_contacts: customers.reduce((sum, c) => sum + c.total_contacts, 0),
+                total_pending: customers.reduce((sum, c) => sum + c.pending_count, 0),
+                total_saved: customers.reduce((sum, c) => sum + c.saved_count, 0),
+                total_existed: customers.reduce((sum, c) => sum + c.existed_count, 0)
+            };
+            
+            return { campaign_name: campaignName, customers, summary };
         } finally {
             connection.release();
         }

@@ -174,7 +174,7 @@ class ContactSaverService {
     }
 
     // Send WhatsApp notification for errors
-    async sendErrorNotification(customerPhone, errorType, errorMessage) {
+    async sendErrorNotification(customerPhone, errorType, errorMessage, customerName = null) {
         const notificationKey = `${customerPhone}:${errorType}`;
         
         if (this.errorNotifications.has(notificationKey)) {
@@ -186,6 +186,12 @@ class ContactSaverService {
         // Update database
         await this.db.updateCustomerError(customerPhone, errorType, errorMessage, true);
         
+        // Get customer name if not provided
+        if (!customerName) {
+            const customer = await this.getCustomerByPhone(customerPhone);
+            customerName = customer?.FullName || 'לא ידוע';
+        }
+        
         const errorMessages = {
             'TOKEN_INVALID': 'טוקן לא תקין - נדרשת התחברות מחדש',
             'PERMISSION_DENIED': 'חסרות הרשאות לשמירת אנשי קשר',
@@ -195,7 +201,8 @@ class ContactSaverService {
 
         const message = `⚠️ *שגיאה בשמירת אנשי קשר*
 
-*לקוח:* ${customerPhone}
+*לקוח:* ${customerName}
+*טלפון:* ${customerPhone}
 *סוג שגיאה:* ${errorMessages[errorType] || errorType}
 *פרטים:* ${errorMessage || 'אין פרטים נוספים'}
 
@@ -365,12 +372,25 @@ class ContactSaverService {
                 phoneColumns.forEach(p => allCustomerPhones.add(p));
             }
             
-            console.log(`Found ${allCustomerPhones.size} customers to process`);
+            const customerPhoneArray = Array.from(allCustomerPhones);
+            console.log(`Found ${customerPhoneArray.length} customers to process`);
             
-            // Process each customer
-            for (const customerPhone of allCustomerPhones) {
-                const result = await this.processCustomer(customerPhone, tables);
-                console.log(`Customer ${customerPhone}: ${JSON.stringify(result)}`);
+            // Process customers in parallel batches of 5
+            const BATCH_SIZE = 5;
+            for (let i = 0; i < customerPhoneArray.length; i += BATCH_SIZE) {
+                const batch = customerPhoneArray.slice(i, i + BATCH_SIZE);
+                const results = await Promise.allSettled(
+                    batch.map(phone => this.processCustomer(phone, tables))
+                );
+                
+                results.forEach((result, idx) => {
+                    const phone = batch[idx];
+                    if (result.status === 'fulfilled') {
+                        console.log(`Customer ${phone}: ${JSON.stringify(result.value)}`);
+                    } else {
+                        console.error(`Customer ${phone} failed:`, result.reason);
+                    }
+                });
             }
             
         } catch (error) {
@@ -396,6 +416,18 @@ class ContactSaverService {
     async getCustomerDetails(customerPhone) {
         await this.initialize();
         return await this.db.getCustomerDetails(customerPhone);
+    }
+
+    // Get all campaigns
+    async getCampaigns() {
+        await this.initialize();
+        return await this.db.getCampaignsWithStats();
+    }
+
+    // Get campaign details
+    async getCampaignDetails(campaignName) {
+        await this.initialize();
+        return await this.db.getCampaignDetails(campaignName);
     }
 }
 

@@ -253,6 +253,34 @@ module.exports = (pool, config, contactSaver) => {
         }
     });
 
+    // Get all campaigns
+    router.get('/campaigns', verifyAdmin, async (req, res) => {
+        try {
+            const campaigns = await contactSaver.getCampaigns();
+            res.json(campaigns);
+        } catch (error) {
+            console.error('Campaigns error:', error);
+            res.status(500).json({ error: 'Failed to get campaigns' });
+        }
+    });
+
+    // Get specific campaign details
+    router.get('/campaigns/:name', verifyAdmin, async (req, res) => {
+        try {
+            const { name } = req.params;
+            const details = await contactSaver.getCampaignDetails(decodeURIComponent(name));
+            
+            if (!details) {
+                return res.status(404).json({ error: 'Campaign not found' });
+            }
+            
+            res.json(details);
+        } catch (error) {
+            console.error('Campaign details error:', error);
+            res.status(500).json({ error: 'Failed to get campaign details' });
+        }
+    });
+
     // Manually trigger contact saver
     router.post('/run-saver', verifyAdmin, async (req, res) => {
         try {
