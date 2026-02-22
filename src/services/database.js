@@ -284,8 +284,9 @@ class DatabaseService {
             
             const custInfo = custRows[0] || {};
             const isTokenError = errorType === 'TOKEN_INVALID' || errorType === 'PERMISSION_DENIED';
+            const notifiedInt = notified ? 1 : 0; // Convert boolean to int for MySQL
             
-            console.log(`Updating error for ${customerPhone}: ${errorType} - ${errorMessage}`);
+            console.log(`Updating error for ${customerPhone}: ${errorType}, notified=${notifiedInt}`);
             
             await connection.execute(`
                 INSERT INTO cs_customers (phone, full_name, email, last_error, last_error_type, error_notified, has_valid_tokens)
@@ -296,9 +297,9 @@ class DatabaseService {
                     error_notified = VALUES(error_notified),
                     has_valid_tokens = VALUES(has_valid_tokens),
                     updated_at = NOW()
-            `, [customerPhone, custInfo.FullName || '', custInfo.Email || '', errorMessage, errorType, notified, isTokenError ? 0 : 1]);
+            `, [customerPhone, custInfo.FullName || '', custInfo.Email || '', errorMessage, errorType, notifiedInt, isTokenError ? 0 : 1]);
             
-            console.log(`Error updated successfully for ${customerPhone}`);
+            console.log(`Error updated successfully for ${customerPhone}, error_notified=${notifiedInt}`);
         } catch (err) {
             console.error(`Failed to update error for ${customerPhone}:`, err.message);
         } finally {
