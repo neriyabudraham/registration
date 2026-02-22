@@ -64,7 +64,7 @@ class ContactSaverService {
         }
     }
 
-    // Get customer by phone from לקוחות table
+    // Get customer by phone from לקוחות table (first account)
     async getCustomerByPhone(phone) {
         const connection = await this.pool.getConnection();
         try {
@@ -90,6 +90,80 @@ class ContactSaverService {
         } finally {
             connection.release();
         }
+    }
+
+    // Get ALL accounts for a customer (multiple Google accounts)
+    async getAllCustomerAccounts(phone) {
+        const connection = await this.pool.getConnection();
+        try {
+            const [rows] = await connection.execute(`
+                SELECT * FROM לקוחות WHERE Phone = ? AND AccessToken IS NOT NULL AND RefreshToken IS NOT NULL
+            `, [phone]);
+            
+            // Decrypt tokens for all accounts
+            return rows.map(customer => {
+                if (customer.AccessToken) {
+                    const decrypted = this.encryption.decrypt(customer.AccessToken);
+                    customer.AccessToken = decrypted || customer.AccessToken;
+                }
+                if (customer.RefreshToken) {
+                    const decrypted = this.encryption.decrypt(customer.RefreshToken);
+                    customer.RefreshToken = decrypted || customer.RefreshToken;
+                }
+                return customer;
+            });
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Create Google services for all accounts
+    createGoogleServices(accounts) {
+        return accounts.map(account => ({
+            email: account.Email,
+            fullName: account.FullName,
+            service: new GoogleContactsService(
+                account.AccessToken,
+                account.RefreshToken,
+                this.config.google.clientId,
+                this.config.google.clientSecret
+            )
+        }));
+    }
+
+    // Check if contact exists in ANY of the accounts
+    async contactExistsInAnyAccount(googleServices, phone) {
+        for (const { service, email } of googleServices) {
+            try {
+                const exists = await service.searchContactByPhone(phone);
+                if (exists) {
+                    return { exists: true, inAccount: email };
+                }
+            } catch (err) {
+                // Skip failed accounts
+            }
+        }
+        return { exists: false };
+    }
+
+    // Get account with least contacts (for saving)
+    async getBestAccountForSaving(googleServices) {
+        let bestAccount = null;
+        let minContacts = Infinity;
+        
+        for (const gs of googleServices) {
+            try {
+                const count = await gs.service.getContactCount();
+                if (count !== null && count < minContacts && count < 25000) {
+                    minContacts = count;
+                    bestAccount = gs;
+                }
+            } catch (err) {
+                // Skip failed accounts
+            }
+        }
+        
+        return bestAccount;
     }
 
     // Update contact status in table
@@ -157,18 +231,28 @@ class ContactSaverService {
         }
     }
 
-    // Update customer tokens in database
-    async updateCustomerTokens(phone, accessToken, refreshToken, expiresIn) {
+    // Update customer tokens in database (optionally by email for multi-account)
+    async updateCustomerTokens(phone, accessToken, refreshToken, expiresIn, email = null) {
         const connection = await this.pool.getConnection();
         try {
             const encryptedAccess = this.encryption.encrypt(accessToken);
             const encryptedRefresh = this.encryption.encrypt(refreshToken);
             
-            await connection.execute(`
-                UPDATE לקוחות 
-                SET AccessToken = ?, RefreshToken = ?, ExpirationTime = ?
-                WHERE Phone = ?
-            `, [encryptedAccess, encryptedRefresh, expiresIn, phone]);
+            if (email) {
+                // Update specific account by email
+                await connection.execute(`
+                    UPDATE לקוחות 
+                    SET AccessToken = ?, RefreshToken = ?, ExpirationTime = ?
+                    WHERE Phone = ? AND Email = ?
+                `, [encryptedAccess, encryptedRefresh, expiresIn, phone, email]);
+            } else {
+                // Update first account for phone
+                await connection.execute(`
+                    UPDATE לקוחות 
+                    SET AccessToken = ?, RefreshToken = ?, ExpirationTime = ?
+                    WHERE Phone = ? LIMIT 1
+                `, [encryptedAccess, encryptedRefresh, expiresIn, phone]);
+            }
         } finally {
             connection.release();
         }
@@ -256,39 +340,53 @@ class ContactSaverService {
             return { status: 'rate_limited', resumeAt: resumeTime };
         }
         
-        // Get customer data
-        const customer = await this.getCustomerByPhone(customerPhone);
-        if (!customer) {
-            return { status: 'customer_not_found' };
-        }
-        
-        if (!customer.AccessToken || !customer.RefreshToken) {
+        // Get ALL accounts for this customer
+        const accounts = await this.getAllCustomerAccounts(customerPhone);
+        if (accounts.length === 0) {
             return { status: 'no_tokens' };
         }
         
-        // Create Google Contacts service
-        const googleService = new GoogleContactsService(
-            customer.AccessToken,
-            customer.RefreshToken,
-            this.config.google.clientId,
-            this.config.google.clientSecret
-        );
+        const customer = accounts[0]; // Primary account for name/info
         
-        // Get contact count in the account
-        const contactCount = await googleService.getContactCount();
-        if (contactCount !== null) {
-            await this.db.updateCustomerContactCount(customerPhone, contactCount);
-            
-            // Check if account has too many contacts (>25000)
-            if (contactCount >= 25000) {
-                await this.sendErrorNotification(
-                    customerPhone, 
-                    'CONTACT_LIMIT_MAX', 
-                    `החשבון מכיל ${contactCount} אנשי קשר - חריגה ממגבלת 25,000. יש לחבר חשבון חדש או למחוק אנשי קשר`,
-                    customer.FullName
-                );
-                return { status: 'contact_limit_max', contactCount };
+        // Create Google services for all accounts
+        const googleServices = this.createGoogleServices(accounts);
+        console.log(`Customer ${customerPhone} has ${accounts.length} account(s): ${accounts.map(a => a.Email).join(', ')}`);
+        
+        // Get total contact count across all accounts
+        let totalContactCount = 0;
+        let allAccountsFull = true;
+        
+        for (const gs of googleServices) {
+            try {
+                const count = await gs.service.getContactCount();
+                if (count !== null) {
+                    totalContactCount += count;
+                    if (count < 25000) {
+                        allAccountsFull = false;
+                    }
+                }
+            } catch (err) {
+                // Account might have invalid token
             }
+        }
+        
+        await this.db.updateCustomerContactCount(customerPhone, totalContactCount);
+        
+        // Check if ALL accounts are full
+        if (allAccountsFull && accounts.length > 0) {
+            await this.sendErrorNotification(
+                customerPhone, 
+                'CONTACT_LIMIT_MAX', 
+                `כל החשבונות מלאים (סה"כ ${totalContactCount} אנשי קשר). יש לחבר חשבון חדש או למחוק אנשי קשר`,
+                customer.FullName
+            );
+            return { status: 'contact_limit_max', contactCount: totalContactCount };
+        }
+        
+        // Get best account for saving (least contacts, under 25k)
+        const bestAccount = await this.getBestAccountForSaving(googleServices);
+        if (!bestAccount) {
+            return { status: 'no_valid_account' };
         }
         
         let savedCount = 0;
@@ -307,11 +405,25 @@ class ContactSaverService {
             for (const contact of contacts) {
                 try {
                     const originalName = contact.FullName || '';
-                    const result = await googleService.saveContactWithLabel(
-                        originalName,
-                        contact.Phone,
-                        tableName
-                    );
+                    
+                    // First check if contact exists in ANY of the customer's accounts
+                    const existsCheck = await this.contactExistsInAnyAccount(googleServices, contact.Phone);
+                    
+                    let result;
+                    if (existsCheck.exists) {
+                        // Contact already exists in one of the accounts
+                        result = { status: 'existed', inAccount: existsCheck.inAccount };
+                    } else {
+                        // Save to the best account (least contacts)
+                        result = await bestAccount.service.saveContactWithLabel(
+                            originalName,
+                            contact.Phone,
+                            tableName
+                        );
+                        if (result.status === 'created') {
+                            result.savedToAccount = bestAccount.email;
+                        }
+                    }
                     
                     const newStatus = result.status === 'created' ? 1 : 2;
                     await this.updateContactStatus(tableName, contact.Phone, customerPhone, newStatus);
@@ -327,14 +439,19 @@ class ContactSaverService {
                         existedCount++;
                     }
                     
-                    // Update tokens if refreshed
-                    if (googleService.accessToken !== customer.AccessToken) {
-                        await this.updateCustomerTokens(
-                            customerPhone,
-                            googleService.accessToken,
-                            googleService.refreshToken,
-                            3600
-                        );
+                    // Update tokens if refreshed (for the account we used)
+                    if (result.status === 'created' && bestAccount.service.accessToken) {
+                        // Find the original account to update
+                        const accountToUpdate = accounts.find(a => a.Email === bestAccount.email);
+                        if (accountToUpdate && bestAccount.service.accessToken !== accountToUpdate.AccessToken) {
+                            await this.updateCustomerTokens(
+                                customerPhone,
+                                bestAccount.service.accessToken,
+                                bestAccount.service.refreshToken,
+                                3600,
+                                bestAccount.email
+                            );
+                        }
                     }
                     
                     // Small delay to avoid rate limits
