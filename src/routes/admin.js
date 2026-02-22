@@ -341,5 +341,143 @@ module.exports = (pool, config, contactSaver) => {
         }
     });
 
+    // ==================== VCF DOWNLOAD & CONTACT MANAGEMENT ====================
+
+    // Generate VCF content for contacts
+    function generateVCF(contacts, labelName) {
+        const formattedLabel = labelName.replace(/_/g, ' ');
+        const now = new Date();
+        const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`;
+        const fullLabel = `${formattedLabel} ${dateStr}`;
+        
+        let vcf = '';
+        for (const contact of contacts) {
+            // Clean and format name
+            let name = contact.FullName || contact.name || 'צופה';
+            name = name.replace(/[^\u0590-\u05FFa-zA-Z0-9\s\-'".]/g, '').trim();
+            if (name.length < 2) name = `צופה ${dateStr}`;
+            if (name.length > 40) name = name.substring(0, 40).trim();
+            
+            // Format phone
+            let phone = contact.Phone || contact.phone || '';
+            phone = phone.replace(/[^0-9+]/g, '');
+            if (!phone.startsWith('+')) {
+                phone = '+' + phone;
+            }
+            
+            vcf += 'BEGIN:VCARD\r\n';
+            vcf += 'VERSION:3.0\r\n';
+            vcf += `FN:${name}\r\n`;
+            vcf += `N:;${name};;;\r\n`;
+            vcf += `TEL;TYPE=CELL:${phone}\r\n`;
+            vcf += `CATEGORIES:${fullLabel}\r\n`;
+            vcf += `NOTE:${fullLabel}\r\n`;
+            vcf += 'END:VCARD\r\n';
+        }
+        return vcf;
+    }
+
+    // Download VCF for a customer (all pending contacts)
+    router.get('/customers/:phone/download-vcf', verifyAdmin, async (req, res) => {
+        const connection = await pool.getConnection();
+        try {
+            const { phone } = req.params;
+            const contacts = await contactSaver.getPendingContactsForCustomer(phone);
+            
+            if (!contacts || contacts.length === 0) {
+                return res.status(404).json({ error: 'No pending contacts found' });
+            }
+            
+            // Get customer info for filename
+            const [custRows] = await connection.execute('SELECT FullName FROM לקוחות WHERE Phone = ?', [phone]);
+            const customerName = custRows[0]?.FullName || phone;
+            
+            const vcf = generateVCF(contacts, 'אנשי_קשר');
+            const filename = `contacts_${customerName.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_')}_${Date.now()}.vcf`;
+            
+            res.setHeader('Content-Type', 'text/vcard; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+            res.send(vcf);
+        } catch (error) {
+            console.error('Download VCF error:', error);
+            res.status(500).json({ error: 'Failed to generate VCF' });
+        } finally {
+            connection.release();
+        }
+    });
+
+    // Download VCF for a specific campaign
+    router.get('/campaigns/:name/customers/:phone/download-vcf', verifyAdmin, async (req, res) => {
+        try {
+            const { name, phone } = req.params;
+            const campaignName = decodeURIComponent(name);
+            const contacts = await contactSaver.getPendingContactsForCampaign(phone, campaignName);
+            
+            if (!contacts || contacts.length === 0) {
+                return res.status(404).json({ error: 'No pending contacts found' });
+            }
+            
+            const vcf = generateVCF(contacts, campaignName);
+            const filename = `${campaignName.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_')}_${Date.now()}.vcf`;
+            
+            res.setHeader('Content-Type', 'text/vcard; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+            res.send(vcf);
+        } catch (error) {
+            console.error('Download campaign VCF error:', error);
+            res.status(500).json({ error: 'Failed to generate VCF' });
+        }
+    });
+
+    // Mark contacts as not for saving (status 3) - for a customer
+    router.post('/customers/:phone/mark-not-saving', verifyAdmin, async (req, res) => {
+        try {
+            const { phone } = req.params;
+            const result = await contactSaver.markContactsAsNotSaving(phone);
+            res.json({ success: true, ...result });
+        } catch (error) {
+            console.error('Mark not saving error:', error);
+            res.status(500).json({ error: 'Failed to mark contacts' });
+        }
+    });
+
+    // Mark contacts as not for saving (status 3) - for a specific campaign
+    router.post('/campaigns/:name/customers/:phone/mark-not-saving', verifyAdmin, async (req, res) => {
+        try {
+            const { name, phone } = req.params;
+            const campaignName = decodeURIComponent(name);
+            const result = await contactSaver.markCampaignContactsAsNotSaving(phone, campaignName);
+            res.json({ success: true, ...result });
+        } catch (error) {
+            console.error('Mark campaign not saving error:', error);
+            res.status(500).json({ error: 'Failed to mark contacts' });
+        }
+    });
+
+    // Mark contacts as saved (status 1) - for a customer (after VCF download)
+    router.post('/customers/:phone/mark-saved', verifyAdmin, async (req, res) => {
+        try {
+            const { phone } = req.params;
+            const result = await contactSaver.markContactsAsSaved(phone);
+            res.json({ success: true, ...result });
+        } catch (error) {
+            console.error('Mark saved error:', error);
+            res.status(500).json({ error: 'Failed to mark contacts' });
+        }
+    });
+
+    // Mark contacts as saved (status 1) - for a specific campaign (after VCF download)
+    router.post('/campaigns/:name/customers/:phone/mark-saved', verifyAdmin, async (req, res) => {
+        try {
+            const { name, phone } = req.params;
+            const campaignName = decodeURIComponent(name);
+            const result = await contactSaver.markCampaignContactsAsSaved(phone, campaignName);
+            res.json({ success: true, ...result });
+        } catch (error) {
+            console.error('Mark campaign saved error:', error);
+            res.status(500).json({ error: 'Failed to mark contacts' });
+        }
+    });
+
     return router;
 };

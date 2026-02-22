@@ -955,7 +955,23 @@
                 </div>
             `;
             
-            // Labels section removed - showing only campaigns table with real stats
+            // Action buttons for all pending contacts
+            if (summary.total_pending > 0) {
+                html += `
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.5rem 0; padding: 1rem; background: #f8fafc; border-radius: 8px;">
+                        <h4 style="width: 100%; margin-bottom: 0.5rem;">⚡ פעולות על ${Number(summary.total_pending).toLocaleString()} אנשי קשר ממתינים:</h4>
+                        <button class="btn btn-primary btn-sm" onclick="downloadCustomerVCF('${customer.phone}')">
+                            📥 הורד VCF
+                        </button>
+                        <button class="btn btn-success btn-sm" onclick="markCustomerSaved('${customer.phone}')">
+                            ✅ סמן כנשמרו
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="markCustomerNotSaving('${customer.phone}')">
+                            ❌ סמן כלא לשמירה
+                        </button>
+                    </div>
+                `;
+            }
             
             // Campaigns table
             if (campaigns && campaigns.length > 0) {
@@ -970,6 +986,7 @@
                                 <th>נשמרו</th>
                                 <th>קיימים</th>
                                 <th>לא לשמירה</th>
+                                <th>פעולות</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -981,6 +998,13 @@
                                     <td style="color: var(--success)">${c.saved_count}</td>
                                     <td>${c.existed_count}</td>
                                     <td style="color: var(--danger)">${c.skipped_count || 0}</td>
+                                    <td style="white-space: nowrap;">
+                                        ${c.pending_count > 0 ? `
+                                            <button class="btn btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); downloadCampaignVCF('${customer.phone}', '${encodeURIComponent(c.campaign_name)}')">📥</button>
+                                            <button class="btn btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--success); color: white;" onclick="event.stopPropagation(); markCampaignSaved('${customer.phone}', '${encodeURIComponent(c.campaign_name)}')">✅</button>
+                                            <button class="btn btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--danger); color: white;" onclick="event.stopPropagation(); markCampaignNotSaving('${customer.phone}', '${encodeURIComponent(c.campaign_name)}')">❌</button>
+                                        ` : '-'}
+                                    </td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -1121,6 +1145,101 @@
             const res = await fetch(`${API_BASE}/migrate-tokens`, { method: 'POST', credentials: 'include' });
             const data = await res.json();
             alert(res.ok ? `הוצפנו: ${data.migrated}, כבר מוצפנים: ${data.skipped}` : 'שגיאה');
+        }
+
+        // ==================== VCF DOWNLOAD & CONTACT MANAGEMENT ====================
+        
+        // Download VCF for all pending contacts of a customer
+        async function downloadCustomerVCF(phone) {
+            try {
+                window.location.href = `${API_BASE}/customers/${phone}/download-vcf`;
+                setTimeout(() => {
+                    showAfterDownloadDialog(phone, null);
+                }, 1000);
+            } catch (e) {
+                alert('שגיאה בהורדה');
+            }
+        }
+        
+        // Download VCF for a specific campaign
+        async function downloadCampaignVCF(phone, campaignName) {
+            try {
+                window.location.href = `${API_BASE}/campaigns/${campaignName}/customers/${phone}/download-vcf`;
+                setTimeout(() => {
+                    showAfterDownloadDialog(phone, campaignName);
+                }, 1000);
+            } catch (e) {
+                alert('שגיאה בהורדה');
+            }
+        }
+        
+        // Show dialog after VCF download
+        function showAfterDownloadDialog(phone, campaignName) {
+            const scope = campaignName ? `קמפיין ${formatCampaignName(decodeURIComponent(campaignName))}` : 'כל הקמפיינים';
+            const result = confirm(`הקובץ הורד!\n\nלאחר ייבוא אנשי הקשר, מה לעשות עם הרשימה?\n\n✅ OK = סמן כנשמרו\n❌ Cancel = בטל (ללא שינוי)`);
+            
+            if (result) {
+                if (campaignName) {
+                    markCampaignSaved(phone, campaignName);
+                } else {
+                    markCustomerSaved(phone);
+                }
+            }
+        }
+        
+        // Mark all pending contacts as saved for a customer
+        async function markCustomerSaved(phone) {
+            if (!confirm('לסמן את כל אנשי הקשר הממתינים כנשמרו?')) return;
+            try {
+                const res = await fetch(`${API_BASE}/customers/${phone}/mark-saved`, { method: 'POST', credentials: 'include' });
+                const data = await res.json();
+                alert(res.ok ? `סומנו ${data.marked} אנשי קשר כנשמרו` : 'שגיאה');
+                loadData();
+                openCustomerDetail(phone);
+            } catch (e) {
+                alert('שגיאה');
+            }
+        }
+        
+        // Mark all pending contacts as not saving for a customer
+        async function markCustomerNotSaving(phone) {
+            if (!confirm('לסמן את כל אנשי הקשר הממתינים כ"לא לשמירה"?')) return;
+            try {
+                const res = await fetch(`${API_BASE}/customers/${phone}/mark-not-saving`, { method: 'POST', credentials: 'include' });
+                const data = await res.json();
+                alert(res.ok ? `סומנו ${data.marked} אנשי קשר כלא לשמירה` : 'שגיאה');
+                loadData();
+                openCustomerDetail(phone);
+            } catch (e) {
+                alert('שגיאה');
+            }
+        }
+        
+        // Mark campaign contacts as saved
+        async function markCampaignSaved(phone, campaignName) {
+            try {
+                const res = await fetch(`${API_BASE}/campaigns/${campaignName}/customers/${phone}/mark-saved`, { method: 'POST', credentials: 'include' });
+                const data = await res.json();
+                alert(res.ok ? `סומנו ${data.marked} אנשי קשר כנשמרו` : 'שגיאה');
+                loadData();
+                openCustomerDetail(phone);
+            } catch (e) {
+                alert('שגיאה');
+            }
+        }
+        
+        // Mark campaign contacts as not saving
+        async function markCampaignNotSaving(phone, campaignName) {
+            if (!confirm('לסמן את אנשי הקשר בקמפיין הזה כ"לא לשמירה"?')) return;
+            try {
+                const res = await fetch(`${API_BASE}/campaigns/${campaignName}/customers/${phone}/mark-not-saving`, { method: 'POST', credentials: 'include' });
+                const data = await res.json();
+                alert(res.ok ? `סומנו ${data.marked} אנשי קשר כלא לשמירה` : 'שגיאה');
+                loadData();
+                openCustomerDetail(phone);
+            } catch (e) {
+                alert('שגיאה');
+            }
         }
         
         // Auto-refresh every 10 seconds for real-time data

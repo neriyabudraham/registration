@@ -450,6 +450,134 @@ class ContactSaverService {
         await this.initialize();
         return await this.db.getCampaignDetails(campaignName);
     }
+
+    // ==================== VCF & CONTACT MANAGEMENT ====================
+
+    // Get all pending contacts for a customer across all campaigns
+    async getPendingContactsForCustomer(customerPhone) {
+        const connection = await this.pool.getConnection();
+        try {
+            const tables = await this.getContactTables();
+            const allContacts = [];
+
+            for (const tableName of tables) {
+                const phoneColumns = await this.getPhoneColumns(tableName);
+                if (!phoneColumns.includes(customerPhone)) continue;
+
+                const [rows] = await connection.execute(`
+                    SELECT Phone, FullName FROM \`${tableName}\` WHERE \`${customerPhone}\` = 0
+                `);
+                
+                rows.forEach(row => {
+                    allContacts.push({
+                        ...row,
+                        campaign: tableName
+                    });
+                });
+            }
+
+            return allContacts;
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Get pending contacts for a specific campaign
+    async getPendingContactsForCampaign(customerPhone, campaignName) {
+        const connection = await this.pool.getConnection();
+        try {
+            const phoneColumns = await this.getPhoneColumns(campaignName);
+            if (!phoneColumns.includes(customerPhone)) return [];
+
+            const [rows] = await connection.execute(`
+                SELECT Phone, FullName FROM \`${campaignName}\` WHERE \`${customerPhone}\` = 0
+            `);
+
+            return rows;
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Mark all pending contacts as "not for saving" (status 3) for a customer
+    async markContactsAsNotSaving(customerPhone) {
+        const connection = await this.pool.getConnection();
+        try {
+            const tables = await this.getContactTables();
+            let totalMarked = 0;
+
+            for (const tableName of tables) {
+                const phoneColumns = await this.getPhoneColumns(tableName);
+                if (!phoneColumns.includes(customerPhone)) continue;
+
+                const [result] = await connection.execute(`
+                    UPDATE \`${tableName}\` SET \`${customerPhone}\` = 3 WHERE \`${customerPhone}\` = 0
+                `);
+                totalMarked += result.affectedRows;
+            }
+
+            return { marked: totalMarked };
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Mark contacts as "not for saving" for a specific campaign
+    async markCampaignContactsAsNotSaving(customerPhone, campaignName) {
+        const connection = await this.pool.getConnection();
+        try {
+            const phoneColumns = await this.getPhoneColumns(campaignName);
+            if (!phoneColumns.includes(customerPhone)) return { marked: 0 };
+
+            const [result] = await connection.execute(`
+                UPDATE \`${campaignName}\` SET \`${customerPhone}\` = 3 WHERE \`${customerPhone}\` = 0
+            `);
+
+            return { marked: result.affectedRows };
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Mark all pending contacts as "saved" (status 1) for a customer
+    async markContactsAsSaved(customerPhone) {
+        const connection = await this.pool.getConnection();
+        try {
+            const tables = await this.getContactTables();
+            let totalMarked = 0;
+
+            for (const tableName of tables) {
+                const phoneColumns = await this.getPhoneColumns(tableName);
+                if (!phoneColumns.includes(customerPhone)) continue;
+
+                const [result] = await connection.execute(`
+                    UPDATE \`${tableName}\` SET \`${customerPhone}\` = 1 WHERE \`${customerPhone}\` = 0
+                `);
+                totalMarked += result.affectedRows;
+            }
+
+            return { marked: totalMarked };
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Mark contacts as "saved" for a specific campaign
+    async markCampaignContactsAsSaved(customerPhone, campaignName) {
+        const connection = await this.pool.getConnection();
+        try {
+            const phoneColumns = await this.getPhoneColumns(campaignName);
+            if (!phoneColumns.includes(customerPhone)) return { marked: 0 };
+
+            const [result] = await connection.execute(`
+                UPDATE \`${campaignName}\` SET \`${customerPhone}\` = 1 WHERE \`${customerPhone}\` = 0
+            `);
+
+            return { marked: result.affectedRows };
+        } finally {
+            connection.release();
+        }
+    }
 }
 
 module.exports = ContactSaverService;
