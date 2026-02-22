@@ -462,7 +462,11 @@ class GoogleContactsService {
             // The totalPeople field gives us the count
             return response.data.totalPeople || response.data.totalItems || 0;
         } catch (error) {
-            console.error('Get contact count error:', error.response?.data || error.message);
+            // Don't log token-related errors (too noisy)
+            const errMsg = error.message || '';
+            if (!errMsg.includes('TOKEN') && !errMsg.includes('401') && !errMsg.includes('REFRESH')) {
+                console.error('Get contact count error:', error.response?.data || error.message);
+            }
             return null; // Return null on error, not 0
         }
     }
