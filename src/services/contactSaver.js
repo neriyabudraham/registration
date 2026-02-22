@@ -170,10 +170,26 @@ class ContactSaverService {
     async updateContactStatus(tableName, primaryPhone, customerPhone, status) {
         const connection = await this.pool.getConnection();
         try {
-            await connection.execute(
-                `UPDATE \`${tableName}\` SET \`${customerPhone}\` = ?, UpdateTime = NOW() WHERE \`Phone\` = ?`,
-                [status, primaryPhone]
-            );
+            // Check if UpdateTime column exists for this customer
+            const updateTimeCol = `UpdateTime_${customerPhone}`;
+            const [cols] = await connection.execute(`
+                SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+            `, [tableName, updateTimeCol]);
+            
+            if (cols.length > 0) {
+                // Update with timestamp
+                await connection.execute(
+                    `UPDATE \`${tableName}\` SET \`${customerPhone}\` = ?, \`${updateTimeCol}\` = NOW() WHERE \`Phone\` = ?`,
+                    [status, primaryPhone]
+                );
+            } else {
+                // Update without timestamp
+                await connection.execute(
+                    `UPDATE \`${tableName}\` SET \`${customerPhone}\` = ? WHERE \`Phone\` = ?`,
+                    [status, primaryPhone]
+                );
+            }
         } finally {
             connection.release();
         }
@@ -354,33 +370,43 @@ class ContactSaverService {
         
         // Get total contact count across all accounts
         let totalContactCount = 0;
-        let allAccountsFull = true;
+        let validAccountsCount = 0;
+        let allValidAccountsFull = true;
         
         for (const gs of googleServices) {
             try {
                 const count = await gs.service.getContactCount();
                 if (count !== null) {
+                    validAccountsCount++;
                     totalContactCount += count;
                     if (count < 25000) {
-                        allAccountsFull = false;
+                        allValidAccountsFull = false;
                     }
                 }
             } catch (err) {
-                // Account might have invalid token
+                // Account might have invalid token - skip it
             }
         }
         
-        await this.db.updateCustomerContactCount(customerPhone, totalContactCount);
+        // Only update count if we got at least one valid response
+        if (validAccountsCount > 0) {
+            await this.db.updateCustomerContactCount(customerPhone, totalContactCount);
+        }
         
-        // Check if ALL accounts are full
-        if (allAccountsFull && accounts.length > 0) {
+        // Check if ALL valid accounts are full (only if we actually have valid accounts)
+        if (validAccountsCount > 0 && allValidAccountsFull) {
             await this.sendErrorNotification(
                 customerPhone, 
                 'CONTACT_LIMIT_MAX', 
-                `כל החשבונות מלאים (סה"כ ${totalContactCount} אנשי קשר). יש לחבר חשבון חדש או למחוק אנשי קשר`,
+                `כל החשבונות מלאים (סה"כ ${totalContactCount} אנשי קשר ב-${validAccountsCount} חשבונות). יש לחבר חשבון חדש או למחוק אנשי קשר`,
                 customer.FullName
             );
             return { status: 'contact_limit_max', contactCount: totalContactCount };
+        }
+        
+        // If no valid accounts at all, return error
+        if (validAccountsCount === 0) {
+            return { status: 'no_valid_accounts', message: 'כל החשבונות עם טוקנים לא תקינים' };
         }
         
         // Get best account for saving (least contacts, under 25k)
