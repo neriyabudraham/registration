@@ -8,3 +8,7 @@ services:
       - .env
     environment:
       - NODE_ENV=production
+    volumes:
+      - ./server.js:/app/server.js:ro
+      - ./src:/app/src:ro
+      - ./public:/app/public:ro
