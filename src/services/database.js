@@ -294,15 +294,30 @@ class DatabaseService {
         }
     }
 
-    // Clear customer error
+    // Clear customer error (called when save succeeds)
     async clearCustomerError(customerPhone) {
         const connection = await this.pool.getConnection();
         try {
             await connection.execute(`
                 UPDATE cs_customers 
-                SET last_error = NULL, last_error_type = NULL, error_notified = FALSE, updated_at = NOW()
+                SET last_error = NULL, last_error_type = NULL, error_notified = 0, has_valid_tokens = 1, updated_at = NOW()
                 WHERE phone = ?
             `, [customerPhone]);
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Get customer error state (for checking if notification was already sent)
+    async getCustomerErrorState(customerPhone) {
+        const connection = await this.pool.getConnection();
+        try {
+            const [rows] = await connection.execute(`
+                SELECT last_error, last_error_type, error_notified 
+                FROM cs_customers 
+                WHERE phone = ?
+            `, [customerPhone]);
+            return rows[0] || null;
         } finally {
             connection.release();
         }

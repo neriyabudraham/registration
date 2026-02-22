@@ -11,7 +11,8 @@ class ContactSaverService {
         this.db = new DatabaseService(pool);
         this.isRunning = false;
         this.rateLimitedCustomers = new Map(); // customerId -> resumeTime
-        this.errorNotifications = new Set(); // Track sent notifications to avoid duplicates
+        // Note: error notifications are now tracked in database (cs_customers.error_notified)
+        // so they persist across restarts
         this.initialized = false;
     }
 
@@ -173,17 +174,30 @@ class ContactSaverService {
         }
     }
 
-    // Send WhatsApp notification for errors
+    // Send WhatsApp notification for errors (persisted in database)
     async sendErrorNotification(customerPhone, errorType, errorMessage, customerName = null) {
-        const notificationKey = `${customerPhone}:${errorType}`;
+        // Only send WhatsApp for critical errors (not temporary rate limits)
+        const criticalErrors = ['TOKEN_INVALID', 'PERMISSION_DENIED', 'CONTACT_LIMIT_EXCEEDED', 'CONTACT_LIMIT_MAX'];
         
-        if (this.errorNotifications.has(notificationKey)) {
+        if (!criticalErrors.includes(errorType)) {
+            // Just update database with error, don't send WhatsApp
+            await this.db.updateCustomerError(customerPhone, errorType, errorMessage, false);
             return;
         }
         
-        this.errorNotifications.add(notificationKey);
+        // Check if we already sent notification for this exact error type (stored in DB)
+        const existingError = await this.db.getCustomerErrorState(customerPhone);
         
-        // Update database
+        if (existingError && 
+            existingError.last_error_type === errorType && 
+            existingError.error_notified === 1) {
+            // Already notified for this error type - just update the message, don't send again
+            await this.db.updateCustomerError(customerPhone, errorType, errorMessage, true);
+            console.log(`Skipping duplicate notification for ${customerPhone} - already notified for ${errorType}`);
+            return;
+        }
+        
+        // Update database first
         await this.db.updateCustomerError(customerPhone, errorType, errorMessage, true);
         
         // Get customer name if not provided
@@ -195,20 +209,9 @@ class ContactSaverService {
         const errorMessages = {
             'TOKEN_INVALID': 'טוקן לא תקין - נדרשת התחברות מחדש',
             'PERMISSION_DENIED': 'חסרות הרשאות לשמירת אנשי קשר',
-            'RATE_LIMIT': 'מגבלת קצב זמנית',
-            'RATE_LIMIT_TEMPORARY': 'מגבלת קצב זמנית - ממתין',
             'CONTACT_LIMIT_EXCEEDED': 'החשבון הגיע למגבלת אנשי קשר - יש למחוק אנשי קשר',
-            'CONTACT_LIMIT_MAX': 'חריגה ממגבלת 25,000 אנשי קשר - יש לחבר חשבון חדש או למחוק אנשי קשר',
-            'UNKNOWN_ERROR': 'שגיאה לא ידועה'
+            'CONTACT_LIMIT_MAX': 'חריגה ממגבלת 25,000 אנשי קשר - יש לחבר חשבון חדש או למחוק אנשי קשר'
         };
-        
-        // Only send WhatsApp notifications for critical errors (not temporary rate limits)
-        const criticalErrors = ['TOKEN_INVALID', 'PERMISSION_DENIED', 'CONTACT_LIMIT_EXCEEDED', 'CONTACT_LIMIT_MAX'];
-        if (!criticalErrors.includes(errorType)) {
-            // Just update database, don't send WhatsApp
-            await this.db.updateCustomerError(customerPhone, errorType, errorMessage, false);
-            return;
-        }
 
         const message = `⚠️ *שגיאה בשמירת אנשי קשר*
 
@@ -231,14 +234,14 @@ class ContactSaverService {
                     'Content-Type': 'application/json'
                 }
             });
+            console.log(`WhatsApp notification sent for ${customerPhone}: ${errorType}`);
         } catch (error) {
             console.error('Failed to send WhatsApp notification:', error.message);
         }
     }
 
-    // Clear error notification
-    clearErrorNotification(customerPhone, errorType) {
-        this.errorNotifications.delete(`${customerPhone}:${errorType}`);
+    // Clear error notification (called when save succeeds)
+    clearErrorNotification(customerPhone) {
         this.db.clearCustomerError(customerPhone);
     }
 
