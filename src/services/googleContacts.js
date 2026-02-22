@@ -9,6 +9,80 @@ class GoogleContactsService {
         this.baseUrl = 'https://people.googleapis.com/v1';
     }
 
+    // ==================== NAME SANITIZATION ====================
+    
+    // Characters to completely remove
+    static CHARS_TO_REMOVE = [
+        '=', '*', ',', '•', '°', '®️', '>', '<', '~', '@', '#', '$', '%', '^', '₪',
+        '{', '}', '[', ']', '+', '◇', '★', '☆', '♡', '⚜️', '⚡️', '🇮🇱', '❤️', '😜',
+        '💖', '✈️', '✌', '✨', '❤', '❤️‍🔥', '💛', '🔥', '🃏', '🌊', '⚔️', '🖤', '🌗',
+        '👻', '🌱', '🌷', '🌸', '🌼', '🌹', '?', '🌿', '🍁', '🍏', '🍒', '🍦', '🤍',
+        '🍷', '🎀', '🎗️', '🤔', '🎬', '🏍', '🏡', '💚', '😄', '👾', '👑', '&', '!',
+        '|', '_', ';', '`', '\\', '\t'
+    ];
+
+    // Sanitize contact name with all rules
+    sanitizeName(name, defaultName = 'צופה') {
+        if (!name || typeof name !== 'string') {
+            return this.generateDefaultName(defaultName);
+        }
+
+        let cleaned = name;
+
+        // Replace newlines with space
+        cleaned = cleaned.replace(/[\r\n]+/g, ' ');
+
+        // Remove all special characters and emojis
+        for (const char of GoogleContactsService.CHARS_TO_REMOVE) {
+            cleaned = cleaned.split(char).join('');
+        }
+
+        // Remove -me suffix
+        cleaned = cleaned.replace(/-me$/gi, '');
+
+        // Remove leading numbers
+        cleaned = cleaned.replace(/^[0-9]+/, '');
+
+        // Remove leading special chars: . - _ ״ " ' space
+        cleaned = cleaned.replace(/^[\.\-_״"'\s]+/, '');
+
+        // Remove trailing special chars: . - _ ״ " ' | ! space
+        cleaned = cleaned.replace(/[\.\-_״"'\s\|!]+$/, '');
+
+        // Remove parentheses (we'll add our own for duplicates)
+        cleaned = cleaned.replace(/[()]/g, '');
+
+        // Replace double spaces with single
+        cleaned = cleaned.replace(/\s{2,}/g, ' ');
+
+        // Replace double special chars (.. -- etc)
+        cleaned = cleaned.replace(/([.\-]){2,}/g, '$1');
+
+        // Trim
+        cleaned = cleaned.trim();
+
+        // Max 40 characters
+        if (cleaned.length > 40) {
+            cleaned = cleaned.substring(0, 40).trim();
+        }
+
+        // Validate: must have at least 2 consecutive Hebrew or English letters
+        const hasValidChars = /[a-zA-Zא-ת]{2,}/.test(cleaned);
+        if (!hasValidChars || cleaned.length < 2) {
+            return this.generateDefaultName(defaultName);
+        }
+
+        return cleaned;
+    }
+
+    // Generate default name with date suffix
+    generateDefaultName(baseName = 'צופה') {
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = String(now.getFullYear()).slice(-2);
+        return `${baseName} ${month}/${year}`;
+    }
+
     // Refresh access token if needed
     async refreshAccessToken() {
         try {
@@ -107,15 +181,26 @@ class GoogleContactsService {
     // Search for contact by phone number
     async searchContactByPhone(phone) {
         try {
-            // Normalize phone for search
+            // Normalize phone for search - try multiple formats
             const normalizedPhone = phone.replace(/[^0-9]/g, '');
             
-            const response = await this.makeRequest(
+            // Try full number first
+            let response = await this.makeRequest(
                 'GET',
-                `${this.baseUrl}/people:searchContacts?query=${normalizedPhone}&readMask=names,phoneNumbers&pageSize=10`
+                `${this.baseUrl}/people:searchContacts?query=${normalizedPhone}&readMask=names,phoneNumbers&pageSize=30`
             );
             
-            const results = response.data.results || [];
+            let results = response.data.results || [];
+            
+            // Also try with last 9 digits (Israeli format without country code)
+            if (results.length === 0 && normalizedPhone.length > 9) {
+                const shortPhone = normalizedPhone.slice(-9);
+                response = await this.makeRequest(
+                    'GET',
+                    `${this.baseUrl}/people:searchContacts?query=${shortPhone}&readMask=names,phoneNumbers&pageSize=30`
+                );
+                results = response.data.results || [];
+            }
             
             // Check if any result matches the phone number
             for (const result of results) {
@@ -123,7 +208,10 @@ class GoogleContactsService {
                 if (person.phoneNumbers) {
                     for (const phoneObj of person.phoneNumbers) {
                         const contactPhone = phoneObj.value.replace(/[^0-9]/g, '');
-                        if (contactPhone.includes(normalizedPhone) || normalizedPhone.includes(contactPhone)) {
+                        // Compare last 9 digits
+                        const last9Contact = contactPhone.slice(-9);
+                        const last9Search = normalizedPhone.slice(-9);
+                        if (last9Contact === last9Search) {
                             return person;
                         }
                     }
@@ -139,6 +227,62 @@ class GoogleContactsService {
             console.error('Search contact error:', error.response?.data || error.message);
             throw error;
         }
+    }
+
+    // Search for contacts by name to check for duplicates
+    async searchContactsByName(name) {
+        try {
+            const response = await this.makeRequest(
+                'GET',
+                `${this.baseUrl}/people:searchContacts?query=${encodeURIComponent(name)}&readMask=names&pageSize=100`
+            );
+            
+            const results = response.data.results || [];
+            const names = [];
+            
+            for (const result of results) {
+                const person = result.person;
+                if (person.names) {
+                    for (const nameObj of person.names) {
+                        if (nameObj.displayName) names.push(nameObj.displayName);
+                        if (nameObj.givenName) names.push(nameObj.givenName);
+                    }
+                }
+            }
+            
+            return names;
+        } catch (error) {
+            if (error.response?.status === 404) {
+                return [];
+            }
+            console.error('Search contacts by name error:', error.response?.data || error.message);
+            return []; // Return empty on error, don't block saving
+        }
+    }
+
+    // Generate unique name by checking existing contacts
+    async generateUniqueName(baseName) {
+        // Search for existing contacts with similar name
+        const existingNames = await this.searchContactsByName(baseName);
+        
+        // Check if exact name exists
+        if (!existingNames.some(n => n === baseName)) {
+            return baseName;
+        }
+        
+        // Find next available number
+        let counter = 1;
+        let uniqueName = `${baseName} (${counter})`;
+        
+        while (existingNames.some(n => n === uniqueName)) {
+            counter++;
+            uniqueName = `${baseName} (${counter})`;
+            
+            // Safety limit
+            if (counter > 1000) break;
+        }
+        
+        return uniqueName;
     }
 
     // Create a new contact
@@ -205,16 +349,17 @@ class GoogleContactsService {
     }
 
     // Main function: Save contact with label
-    async saveContactWithLabel(name, phone, labelName) {
+    // defaultName: optional default name for invalid names (e.g., "צופה")
+    async saveContactWithLabel(name, phone, labelName, defaultName = 'צופה') {
         try {
-            // Format label name (remove underscores)
+            // Format label name (remove underscores, add date)
             const formattedLabelName = this.formatLabelName(labelName);
             
             // 1. Get or create the label
             const group = await this.getOrCreateContactGroup(formattedLabelName);
             const groupResourceName = group.resourceName;
             
-            // 2. Check if contact already exists
+            // 2. Check if contact already exists by phone
             const existingContact = await this.searchContactByPhone(phone);
             
             if (existingContact) {
@@ -230,9 +375,15 @@ class GoogleContactsService {
                 return { status: 'existed', contact: existingContact };
             }
             
-            // 3. Create new contact with group
-            const newContact = await this.createContact(name, phone, groupResourceName);
-            return { status: 'created', contact: newContact };
+            // 3. Sanitize the name
+            let sanitizedName = this.sanitizeName(name, defaultName);
+            
+            // 4. Generate unique name (avoid duplicates)
+            const uniqueName = await this.generateUniqueName(sanitizedName);
+            
+            // 5. Create new contact with group
+            const newContact = await this.createContact(uniqueName, phone, groupResourceName);
+            return { status: 'created', contact: newContact, savedName: uniqueName };
             
         } catch (error) {
             // Check for rate limit
