@@ -800,7 +800,7 @@
                         ` : ''}
                     </div>
                     <div class="customer-card-footer">
-                        <span>${c.email || '-'}</span>
+                        <span title="${(c.accounts || [{email: c.email}]).map(a => a.email).join(', ')}">${c.accounts?.length > 1 ? `📧 ${c.accounts.length} חשבונות` : (c.email || '-')}</span>
                         <span style="font-size: 0.75rem;">${c.updated_at ? new Date(c.updated_at).toLocaleString('he-IL') : ''}</span>
                     </div>
                 </div>
@@ -946,7 +946,7 @@
                         ` : ''}
                     </div>
                     <div class="customer-card-footer">
-                        <span>${c.email || '-'}</span>
+                        <span title="${(c.accounts || [{email: c.email}]).map(a => a.email).join(', ')}">${c.accounts?.length > 1 ? `📧 ${c.accounts.length} חשבונות` : (c.email || '-')}</span>
                         ${c.last_hour_saved > 0 ? `<span class="last-hour-badge">+${c.last_hour_saved} בשעה</span>` : ''}
                     </div>
                 </div>
@@ -1037,6 +1037,23 @@
                     }
                 </div>
             `;
+            
+            // Show all linked accounts
+            if (customer.accounts && customer.accounts.length > 0) {
+                html += `
+                    <div style="background: #f3f4f6; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">📧 חשבונות מקושרים (${customer.accounts.length}):</div>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            ${customer.accounts.map(acc => `
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="width: 20px;">${acc.has_tokens ? '✅' : '❌'}</span>
+                                    <span style="flex: 1;">${acc.email}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
             
             // Error alert with details and reconnection buttons
             if (hasError) {

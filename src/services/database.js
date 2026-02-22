@@ -476,7 +476,7 @@ class DatabaseService {
             const customers = [];
 
             for (const phone of allCustomerPhones) {
-                // Get customer info from לקוחות table
+                // Get ALL customer accounts from לקוחות table (multiple emails per phone)
                 const [custRows] = await connection.execute(`
                     SELECT Phone, Email, FullName, GroupID, 
                            CASE WHEN AccessToken IS NOT NULL AND RefreshToken IS NOT NULL THEN 1 ELSE 0 END as has_valid_tokens
@@ -510,6 +510,12 @@ class DatabaseService {
                 const errorInfo = errorRows[0] || {};
                 const lastActivity = recentActivity[0];
                 
+                // Collect all accounts (emails) for this phone
+                const accounts = custRows.map(row => ({
+                    email: row.Email,
+                    has_tokens: row.has_valid_tokens === 1
+                }));
+                
                 // Determine error state:
                 // 1. If cs_customers has error, use it
                 // 2. If not but last activity was an error, use that
@@ -524,15 +530,18 @@ class DatabaseService {
                 // Check if it's a token error
                 const isTokenError = lastErrorType === 'TOKEN_INVALID' || lastErrorType === 'PERMISSION_DENIED';
                 
-                // has_valid_tokens: false if cs_customers says so, or if there's a token error, or if לקוחות doesn't have tokens
+                // has_valid_tokens: true if ANY account has valid tokens and no critical error
+                const anyAccountHasTokens = accounts.some(a => a.has_tokens);
                 const hasValidTokens = errorInfo.cs_valid_tokens === 0 ? false : 
-                                       (isTokenError ? false : custInfo.has_valid_tokens === 1);
+                                       (isTokenError ? false : anyAccountHasTokens);
 
                 customers.push({
                     phone: phone,
                     email: custInfo.Email,
                     full_name: custInfo.FullName,
                     group_id: custInfo.GroupID,
+                    accounts: accounts, // Array of all linked accounts
+                    accounts_count: accounts.length,
                     has_valid_tokens: hasValidTokens,
                     last_error: lastError,
                     last_error_type: lastErrorType,
@@ -709,7 +718,7 @@ class DatabaseService {
     async getCustomerDetails(customerPhone) {
         const connection = await this.pool.getConnection();
         try {
-            // Get customer info from לקוחות table
+            // Get ALL customer accounts from לקוחות table (multiple emails per phone)
             const [custRows] = await connection.execute(`
                 SELECT Phone, Email, FullName, GroupID, 
                        CASE WHEN AccessToken IS NOT NULL AND RefreshToken IS NOT NULL THEN 1 ELSE 0 END as has_valid_tokens
@@ -723,13 +732,24 @@ class DatabaseService {
 
             const custInfo = custRows[0] || {};
             const errorInfo = errorRows[0] || {};
+            
+            // Collect all accounts
+            const accounts = custRows.map(row => ({
+                email: row.Email,
+                has_tokens: row.has_valid_tokens === 1
+            }));
+            
+            // Any account has valid tokens
+            const anyAccountHasTokens = accounts.some(a => a.has_tokens);
 
             const customer = {
                 phone: customerPhone,
                 email: custInfo.Email,
                 full_name: custInfo.FullName,
                 group_id: custInfo.GroupID,
-                has_valid_tokens: custInfo.has_valid_tokens === 1,
+                accounts: accounts,
+                accounts_count: accounts.length,
+                has_valid_tokens: anyAccountHasTokens,
                 last_error: errorInfo.last_error,
                 last_error_type: errorInfo.last_error_type,
                 google_contact_count: errorInfo.google_contact_count
