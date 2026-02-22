@@ -6,31 +6,22 @@
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 const axios = require('axios');
+const EncryptionService = require('../services/encryption');
 
-// Encryption service for decrypting tokens
-const crypto = require('crypto');
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+// Use the actual encryption service from the project
+const encryptionService = new EncryptionService(process.env.ENCRYPTION_KEY);
 
 function decrypt(encryptedText) {
-    if (!encryptedText || !ENCRYPTION_KEY) return encryptedText;
-    try {
-        const parts = encryptedText.split(':');
-        if (parts.length !== 3) return encryptedText;
-        
-        const iv = Buffer.from(parts[0], 'hex');
-        const authTag = Buffer.from(parts[1], 'hex');
-        const encrypted = Buffer.from(parts[2], 'hex');
-        
-        const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
-        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-        decipher.setAuthTag(authTag);
-        
-        let decrypted = decipher.update(encrypted, null, 'utf8');
-        decrypted += decipher.final('utf8');
-        return decrypted;
-    } catch (e) {
+    if (!encryptedText) return null;
+    
+    // Check if it looks like a raw Google token (starts with 1//)
+    if (encryptedText.startsWith('1//')) {
         return encryptedText;
     }
+    
+    // Try to decrypt
+    const decrypted = encryptionService.decrypt(encryptedText);
+    return decrypted || encryptedText; // Return original if decryption fails
 }
 
 async function refreshAccessToken(refreshToken) {
@@ -154,6 +145,16 @@ async function run() {
             // Decrypt tokens
             let accessToken = decrypt(customer.AccessToken);
             const refreshToken = decrypt(customer.RefreshToken);
+            
+            // Debug: show token info
+            const tokenStart = refreshToken?.substring(0, 20) || 'null';
+            const isGoogleFormat = refreshToken?.startsWith('1//');
+            console.log(`  Token preview: ${tokenStart}... (Google format: ${isGoogleFormat})`);
+            
+            if (!refreshToken) {
+                console.log(`  ⚠️ Decryption returned null - skipping`);
+                continue;
+            }
             
             // Try to refresh access token
             const newAccessToken = await refreshAccessToken(refreshToken);
